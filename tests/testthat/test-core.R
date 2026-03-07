@@ -17,12 +17,12 @@ test_that("registry: register, retrieve, and list models", {
       default_grid = function() tibble::tibble()
     )
   )
-
+  
   expect_true("test_trivial" %in% list_cr_models())
-
+  
   mdl <- get_cr_model("test_trivial")
   expect_named(mdl, c("fit", "predict_cif", "info"))
-
+  
   info <- mdl$info()
   expect_equal(info$name, "Trivial test model")
   expect_false(info$needs_tuning)
@@ -67,17 +67,9 @@ test_that("WeightedBrierScore returns values in [0, 1]", {
   status <- sample(c(0L, 1L, 2L), n, replace = TRUE)
   preds  <- matrix(runif(n), ncol = 1)
   res    <- WeightedBrierScore(preds, tau = 0.5, time = time,
-                                status = status, cause = 1L,
-                                cens.code = 0L, cmprsk = TRUE)
+                               status = status, cause = 1L,
+                               cens.code = 0L, cmprsk = TRUE)
   expect_true(all(res$weighted.brier.score >= 0))
-})
-
-test_that("sim_cmprks returns a data frame with correct columns", {
-  df <- sim_cmprks(n = 200, seed = 42)
-  expect_s3_class(df, "data.frame")
-  expect_true("Tobs"  %in% names(df))
-  expect_true("cause" %in% names(df))
-  expect_true(all(df$cause %in% c(0L, 1L, 2L)))
 })
 
 test_that("built-in models are registered on package load", {

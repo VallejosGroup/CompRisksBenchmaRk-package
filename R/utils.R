@@ -22,12 +22,12 @@ prepare_data <- function(df, time_col, event_col) {
   nm[nm == time_col]  <- "time"
   nm[nm == event_col] <- "event"
   names(df) <- nm
-
+  
   min_time <- suppressWarnings(min(df$time, na.rm = TRUE))
   if (is.finite(min_time) && min_time == 0) {
     df$time <- df$time + 0.01
   }
-
+  
   df[order(df$time), , drop = FALSE]
 }
 
@@ -45,27 +45,27 @@ prepare_data <- function(df, time_col, event_col) {
 #'   `feature_cols`, and `types`.
 #' @export
 infer_data_types <- function(df, feature_cols,
-                              core_cols = c("time", "event", "row_id")) {
+                             core_cols = c("time", "event", "row_id")) {
   types <- stats::setNames(
     vector("list", length(core_cols) + length(feature_cols)),
     c(core_cols, feature_cols)
   )
-
+  
   types[["time"]]   <- "numeric"
   types[["event"]]  <- "integer"
   types[["row_id"]] <- "character"
-
+  
   for (cn in feature_cols) {
     if (!cn %in% names(df)) next
     x <- df[[cn]]
     types[[cn]] <- if (is.logical(x))   "logical"
-                   else if (is.factor(x))    "factor"
-                   else if (is.character(x)) "character"
-                   else if (is.integer(x))   "integer"
-                   else if (is.numeric(x))   "numeric"
-                   else                      "character"
+    else if (is.factor(x))    "factor"
+    else if (is.character(x)) "character"
+    else if (is.integer(x))   "integer"
+    else if (is.numeric(x))   "numeric"
+    else                      "character"
   }
-
+  
   list(version = 1L, core_cols = core_cols,
        feature_cols = feature_cols, types = as.list(types))
 }
@@ -94,35 +94,35 @@ infer_data_types <- function(df, feature_cols,
 #' @return Invisibly `TRUE`.
 #' @export
 create_nested_splits <- function(df,
-                                  time_col,
-                                  event_col,
-                                  id_col       = NULL,
-                                  out_dir      = NULL,
-                                  outer_folds  = 5,
-                                  inner_folds  = 3,
-                                  seed         = 123,
-                                  times) {
+                                 time_col,
+                                 event_col,
+                                 id_col       = NULL,
+                                 out_dir      = NULL,
+                                 outer_folds  = 5,
+                                 inner_folds  = 3,
+                                 seed         = 123,
+                                 times) {
   if (!dir.exists(out_dir))
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-
+  
   df <- prepare_data(df = df, time_col = time_col, event_col = event_col)
-
+  
   if (!is.null(id_col)) {
     df$row_id <- as.character(df[[id_col]])
     df[[id_col]] <- NULL
   } else {
     df$row_id <- as.character(seq_len(nrow(df)))
   }
-
+  
   core_cols    <- c("time", "event", "row_id")
   feature_cols <- setdiff(names(df), core_cols)
-
+  
   schema <- infer_data_types(df, feature_cols = feature_cols,
-                              core_cols = core_cols)
+                             core_cols = core_cols)
   jsonlite::write_json(schema,
                        file.path(out_dir, "data_types.json"),
                        auto_unbox = TRUE, pretty = TRUE)
-
+  
   for_python <- list(
     version     = 1,
     outer_folds = outer_folds,
@@ -138,18 +138,18 @@ create_nested_splits <- function(df,
   jsonlite::write_json(times,
                        file.path(out_dir, "times.json"),
                        auto_unbox = TRUE)
-
+  
   set.seed(seed)
   outer <- rsample::vfold_cv(df, v = outer_folds, strata = "event")
-
+  
   for (v in seq_len(outer_folds)) {
     split_v <- outer$splits[[v]]
     train   <- rsample::analysis(split_v)
     test    <- rsample::assessment(split_v)
-
+    
     out_v_dir <- file.path(out_dir, sprintf("outer_%d", v))
     dir.create(out_v_dir, recursive = TRUE, showWarnings = FALSE)
-
+    
     arrow::write_parquet(
       dplyr::select(train, dplyr::all_of(c("time", "event", feature_cols, "row_id"))),
       file.path(out_v_dir, "train.parquet")
@@ -158,19 +158,19 @@ create_nested_splits <- function(df,
       dplyr::select(test,  dplyr::all_of(c("time", "event", feature_cols, "row_id"))),
       file.path(out_v_dir, "test.parquet")
     )
-
+    
     set.seed(seed + v)
     inner     <- rsample::vfold_cv(train, v = inner_folds, strata = "event")
     inner_dir <- file.path(out_v_dir, "inner")
     dir.create(inner_dir, showWarnings = FALSE)
-
+    
     for (j in seq_len(inner_folds)) {
       split_j    <- inner$splits[[j]]
       train_in   <- rsample::analysis(split_j)
       val_in     <- rsample::assessment(split_j)
       fold_j_dir <- file.path(inner_dir, sprintf("fold_%d", j))
       dir.create(fold_j_dir, showWarnings = FALSE)
-
+      
       idx_payload <- list(
         train_row_id = train_in[["row_id"]],
         val_row_id   = val_in[["row_id"]]
@@ -180,7 +180,7 @@ create_nested_splits <- function(df,
                            auto_unbox = TRUE)
     }
   }
-
+  
   invisible(TRUE)
 }
 
@@ -198,21 +198,21 @@ create_nested_splits <- function(df,
 apply_data_types <- function(df, schema) {
   out   <- df
   types <- schema$types
-
+  
   if ("time"   %in% names(out)) out$time   <- as.numeric(out$time)
   if ("event"  %in% names(out)) out$event  <- as.integer(out$event)
   if ("row_id" %in% names(out)) out$row_id <- as.character(out$row_id)
-
+  
   for (cn in names(types)) {
     if (!cn %in% names(out)) next
     if (cn %in% c("time", "event", "row_id")) next
     typ <- types[[cn]]
     out[[cn]] <- switch(typ,
-      numeric   = as.numeric(out[[cn]]),
-      integer   = as.integer(out[[cn]]),
-      logical   = as.logical(out[[cn]]),
-      factor    = as.factor(out[[cn]]),
-      as.character(out[[cn]])
+                        numeric   = as.numeric(out[[cn]]),
+                        integer   = as.integer(out[[cn]]),
+                        logical   = as.logical(out[[cn]]),
+                        factor    = as.factor(out[[cn]]),
+                        as.character(out[[cn]])
     )
   }
   out
@@ -292,26 +292,26 @@ impute_mice <- function(train, test, feature_cols, m, maxit, seed,
                         drop_cols_after_impute) {
   train_x <- train[, feature_cols, drop = FALSE]
   test_x  <- test[,  feature_cols, drop = FALSE]
-
+  
   meth  <- mice::make.method(train_x)
   predM <- mice::make.predictorMatrix(train_x)
-
+  
   imp_train <- mice::mice(train_x, m = m, method = meth,
-                           predictorMatrix = predM, maxit = maxit,
-                           seed = seed, printFlag = FALSE, ridge = 1e-6)
+                          predictorMatrix = predM, maxit = maxit,
+                          seed = seed, printFlag = FALSE, ridge = 1e-6)
   imp_test  <- mice::mice.mids(imp_train, newdata = test_x,
-                                 printFlag = FALSE)
-
+                               printFlag = FALSE)
+  
   train_x_imp <- mice::complete(imp_train, action = "all")
   test_x_imp  <- mice::complete(imp_test,  action = "all")
-
+  
   keep_cols    <- setdiff(names(train), feature_cols)
   imputations  <- vector("list", m)
-
+  
   for (k in seq_len(m)) {
     tr_k <- cbind(train[, keep_cols, drop = FALSE], train_x_imp[[k]])
     te_k <- cbind(test[,  keep_cols, drop = FALSE], test_x_imp[[k]])
-
+    
     if (!is.null(drop_cols_after_impute)) {
       tr_k <- tr_k[, !(names(tr_k) %in% drop_cols_after_impute), drop = FALSE]
       te_k <- te_k[, !(names(te_k) %in% drop_cols_after_impute), drop = FALSE]
@@ -349,22 +349,22 @@ impute_mice <- function(train, test, feature_cols, m, maxit, seed,
 #'   }
 #' @export
 impute_split <- function(train, test, feature_cols,
-                          method = c("none", "median_mode", "mice"),
-                          m      = 1L,
-                          maxit  = 100L,
-                          seed   = 1L,
-                          drop_cols_after_impute = NULL) {
+                         method = c("none", "median_mode", "mice"),
+                         m      = 1L,
+                         maxit  = 100L,
+                         seed   = 1L,
+                         drop_cols_after_impute = NULL) {
   method <- match.arg(method)
-
+  
   if (method == "mice") {
     cat("Default number of datasets m: ", m, ", and iterations: ", maxit,
         " seed: ", seed, "\n")
   }
-
+  
   if (!split_detect_NA(train, test, feature_cols) || method == "none") {
     return(list(m = 1L, imputations = list(list(train = train, test = test))))
   }
-
+  
   if (method == "median_mode") {
     imp <- impute_median_mode_single(
       train = train, test = test,
@@ -374,7 +374,7 @@ impute_split <- function(train, test, feature_cols,
     return(list(m = 1L,
                 imputations = list(list(train = imp$train, test = imp$test))))
   }
-
+  
   if (method == "mice") {
     return(impute_mice(
       train = train, test = test,
@@ -382,7 +382,7 @@ impute_split <- function(train, test, feature_cols,
       drop_cols_after_impute = drop_cols_after_impute
     ))
   }
-
+  
   stop("Unsupported method: ", method)
 }
 
@@ -420,45 +420,45 @@ pool_cifs_mean <- function(cif_list) {
 remake_X <- function(train_df, new_df, feature_cols) {
   tr <- train_df[, feature_cols, drop = FALSE]
   nw <- new_df[,  feature_cols, drop = FALSE]
-
+  
   fcols <- names(tr)[vapply(tr, is.factor, logical(1L))]
   for (cn in fcols)
     nw[[cn]] <- factor(nw[[cn]], levels = levels(tr[[cn]]))
-
+  
   tt    <- stats::terms(~ ., data = tr)
   mf_tr <- stats::model.frame(tt, data = tr, na.action = stats::na.pass)
   X_tr  <- stats::model.matrix(tt, data = mf_tr)[, -1L, drop = FALSE]
-
+  
   tt    <- stats::terms(~ ., data = nw)
   mf_nw <- stats::model.frame(tt, data = nw, na.action = stats::na.pass)
   X_nw  <- stats::model.matrix(tt, data = mf_nw)[, -1L, drop = FALSE]
-
+  
   colnames(X_tr) <- make.names(colnames(X_tr), unique = TRUE)
   colnames(X_nw) <- make.names(colnames(X_nw), unique = TRUE)
-
+  
   miss <- setdiff(colnames(X_tr), colnames(X_nw))
   if (length(miss))
     X_nw <- cbind(X_nw,
                   matrix(0, nrow(X_nw), length(miss),
                          dimnames = list(NULL, miss)))
   X_nw <- X_nw[, colnames(X_tr), drop = FALSE]
-
+  
   keep_var <- apply(X_tr, 2L, function(z) stats::sd(z) > 0)
   if (any(!keep_var)) {
     X_tr <- X_tr[, keep_var, drop = FALSE]
     X_nw <- X_nw[, keep_var, drop = FALSE]
   }
-
+  
   if (ncol(X_tr) > 0L) {
     q   <- qr(X_tr)
     piv <- q$pivot[seq_len(q$rank)]
     X_tr <- X_tr[, piv, drop = FALSE]
     X_nw <- X_nw[, colnames(X_tr), drop = FALSE]
   }
-
+  
   storage.mode(X_tr) <- "double"
   storage.mode(X_nw) <- "double"
-
+  
   list(x_train = X_tr, x_new = X_nw)
 }
 
@@ -575,60 +575,6 @@ extract_fgrp_coefs <- function(fit_obj, tol = 1e-8) {
 #'   avoid numerical overflow.
 #' @param seed      Random seed (default 123).
 #'
-#' @return A data frame with columns `Tobs`, `cause`, and the covariate
-#'   columns.
-#' @export
-sim_cmprks <- function(n         = 30000L,
-                        p_block   = 4L,
-                        gammas    = 10,
-                        cens_frac = 0.5,
-                        cap       = NULL,
-                        seed      = 123L) {
-  set.seed(seed)
-
-  gamma1 <- gamma2 <- gamma3 <- rep(gammas, p_block)
-  x1 <- matrix(stats::rnorm(n * p_block), n, p_block)
-  x2 <- matrix(stats::rnorm(n * p_block), n, p_block)
-  x3 <- matrix(stats::rnorm(n * p_block), n, p_block)
-
-  eta1 <- (as.numeric(x3 %*% gamma3))^2 + as.numeric(x1 %*% gamma1)
-  eta2 <- (as.numeric(x3 %*% gamma3))^2 + as.numeric(x2 %*% gamma2)
-
-  if (!is.null(cap)) {
-    eta1 <- pmin(pmax(eta1, -cap), cap)
-    eta2 <- pmin(pmax(eta2, -cap), cap)
-  }
-
-  T1 <- stats::rexp(n, rate = 1 / exp(eta1))
-  T2 <- stats::rexp(n, rate = 1 / exp(eta2))
-  si <- pmin(T1, T2)
-
-  sc <- rep(Inf, n)
-  if (cens_frac > 0) {
-    cens_idx      <- sample.int(n, size = floor(cens_frac * n))
-    sc[cens_idx]  <- stats::runif(length(cens_idx), 0, si[cens_idx])
-  }
-
-  Tobs  <- pmin(T1, T2, sc)
-  cause <- integer(n)
-  is_cens <- sc <= si
-  uncens  <- !is_cens
-  c1 <- T1[uncens] < T2[uncens]
-  c2 <- T2[uncens] < T1[uncens]
-  tie <- !(c1 | c2)
-  tmp <- integer(sum(uncens))
-  tmp[c1] <- 1L
-  tmp[c2] <- 2L
-  if (any(tie))
-    tmp[tie] <- sample(c(1L, 2L), sum(tie), replace = TRUE)
-  cause[uncens] <- tmp
-
-  colnames(x1) <- sprintf("x1_%d", seq_len(p_block))
-  colnames(x2) <- sprintf("x2_%d", seq_len(p_block))
-  colnames(x3) <- sprintf("x3_%d", seq_len(p_block))
-  data.frame(Tobs, cause, x1, x2, x3)
-}
-
 
 #' Trapezoidal numerical integration
 #'
@@ -658,19 +604,19 @@ compute_rmlt_from_cif <- function(out, times, tau = max(times)) {
   d     <- dim(out)
   n     <- d[1L]; K <- d[2L]
   idx_t <- which(times <= tau)
-
+  
   if (length(idx_t) < 2L) {
     res <- matrix(0, nrow = n, ncol = K)
     colnames(res) <- paste0("cause_", seq_len(K))
     return(res)
   }
-
+  
   times_use <- times[idx_t]
   res <- matrix(NA_real_, nrow = n, ncol = K)
   for (k in seq_len(K)) {
     cif_mat    <- matrix(out[, k, idx_t, drop = FALSE], nrow = n)
     res[, k]   <- apply(cif_mat, 1L,
-                         trapezoidal.integration, x = times_use)
+                        trapezoidal.integration, x = times_use)
   }
   colnames(res) <- paste0("cause_", seq_len(K))
   res
@@ -695,31 +641,31 @@ compute_rmlt_from_cif <- function(out, times, tau = max(times)) {
 #' @return Invisibly, the path to the cache directory.
 #' @export
 build_imputation_cache <- function(out_dir                = "../BenchResults",
-                                    impute_method          = c("mice", "median_mode"),
-                                    seed                   = 123L,
-                                    m                      = 1L,
-                                    maxit                  = 20L,
-                                    drop_cols_after_impute = NULL,
-                                    overwrite              = FALSE,
-                                    verbose                = TRUE) {
+                                   impute_method          = c("mice", "median_mode"),
+                                   seed                   = 123L,
+                                   m                      = 1L,
+                                   maxit                  = 20L,
+                                   drop_cols_after_impute = NULL,
+                                   overwrite              = FALSE,
+                                   verbose                = TRUE) {
   impute_method <- match.arg(impute_method)
-
+  
   manifest_path <- file.path(out_dir, "manifest.json")
   schema_path   <- file.path(out_dir, "data_types.json")
   times_path    <- file.path(out_dir, "times.json")
-
+  
   man    <- jsonlite::fromJSON(manifest_path, simplifyVector = TRUE)
   schema <- jsonlite::fromJSON(schema_path,   simplifyVector = TRUE)
-
+  
   outer_folds  <- as.integer(man$outer_folds)
   feature_cols <- setdiff(man$features, "row_id")
-
+  
   cache_dir <- file.path(
     dirname(out_dir),
     paste0(basename(out_dir), "_imputed_", impute_method)
   )
   dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
-
+  
   file.copy(manifest_path, file.path(cache_dir, "manifest.json"),
             overwrite = TRUE)
   if (file.exists(schema_path))
@@ -728,16 +674,16 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
   if (file.exists(times_path))
     file.copy(times_path, file.path(cache_dir, "times.json"),
               overwrite = TRUE)
-
+  
   add_row_id <- function(df)
     data.frame(row_id = rownames(df), df, check.names = FALSE)
-
+  
   write_if_needed <- function(df, path) {
     if (!overwrite && file.exists(path)) return(invisible(FALSE))
     arrow::write_parquet(df, path, compression = "zstd")
     invisible(TRUE)
   }
-
+  
   write_imp_pair <- function(imp, out_dir_split, test_prefix = "test") {
     dir.create(out_dir_split, recursive = TRUE, showWarnings = FALSE)
     for (k in seq_len(imp$m)) {
@@ -751,7 +697,7 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
                                 sprintf("%s_imp_%d.parquet", test_prefix, k)))
     }
   }
-
+  
   for (v in seq_len(outer_folds)) {
     fold_dir <- file.path(out_dir, sprintf("outer_%d", v))
     train <- apply_data_types(
@@ -764,7 +710,7 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
     )
     rownames(train) <- as.character(train$row_id); train$row_id <- NULL
     rownames(test)  <- as.character(test$row_id);  test$row_id  <- NULL
-
+    
     out_fold_cache <- file.path(cache_dir, sprintf("outer_%d", v))
     if (verbose) message("[impute->parquet] ", impute_method, " outer ", v)
     imp_outer <- impute_split(
@@ -773,28 +719,28 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
       method = impute_method, m = m, maxit = maxit, seed = seed + 1000L + v
     )
     write_imp_pair(imp_outer, out_fold_cache, test_prefix = "test")
-
+    
     inner_dir  <- file.path(fold_dir, "inner")
     if (!dir.exists(inner_dir)) next
-
+    
     inner_dirs <- list.dirs(inner_dir, recursive = FALSE, full.names = TRUE)
     inner_dirs <- inner_dirs[grepl("fold_[0-9]+$", basename(inner_dirs))]
-
+    
     for (j in seq_along(inner_dirs)) {
       idx_path <- file.path(inner_dirs[j], "indices.json")
       idx      <- jsonlite::fromJSON(idx_path, simplifyVector = TRUE)
       tr_ids   <- as.character(idx$train_row_id)
       va_ids   <- as.character(idx$val_row_id)
-
+      
       train_in <- train[tr_ids, , drop = FALSE]
       val_in   <- train[va_ids, , drop = FALSE]
-
+      
       in_cache_dir <- file.path(out_fold_cache, "inner",
                                 basename(inner_dirs[j]))
       dir.create(in_cache_dir, recursive = TRUE, showWarnings = FALSE)
       file.copy(idx_path, file.path(in_cache_dir, "indices.json"),
                 overwrite = TRUE)
-
+      
       if (verbose)
         message("[impute->parquet] ", impute_method,
                 " outer ", v, " inner ", j)
@@ -807,7 +753,7 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
       write_imp_pair(imp_inner, in_cache_dir, test_prefix = "val")
     }
   }
-
+  
   invisible(cache_dir)
 }
 
@@ -825,19 +771,19 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
 #' @export
 summarize_out_of_sample <- function(results, num_causes, times) {
   tab <- list()
-
+  
   for (i in seq_along(results)) {
     r      <- results[[i]]
     model  <- names(results)[[i]]
     outer_folds <- length(r)
-
+    
     for (v in seq_len(outer_folds)) {
       res_fold <- r[[v]]
       causes   <- num_causes
-
+      
       get_or_na <- function(x, len)
         if (!is.null(x)) x else array(NA_real_, len)
-
+      
       for (cause in seq_len(causes)) {
         bs         <- get_or_na(res_fold$cause_bs[[cause]],          length(times))
         ibs        <- get_or_na(res_fold$cause_ibs[[cause]],         length(times))
@@ -852,7 +798,7 @@ summarize_out_of_sample <- function(results, num_causes, times) {
         else
           list(ICI = NA_real_, E50 = NA_real_, E90 = NA_real_,
                Emax = NA_real_, RSB = NA_real_)
-
+        
         tab[[length(tab) + 1L]] <- data.frame(
           model      = model,
           fold       = v,
@@ -922,19 +868,19 @@ aggregate_out_of_sample <- function(df, metrics) {
 #' @return Called for its side effect (prints plots).
 #' @export
 plot_out_of_sample <- function(agg,
-                                metrics  = c("bs", "ibs", "auc",
-                                             "cidx_pec", "cidx_survM",
-                                             "ICI", "E50", "E90",
-                                             "Emax", "RSB"),
-                                cause    = NULL,
-                                plot_tau = TRUE) {
+                               metrics  = c("bs", "ibs", "auc",
+                                            "cidx_pec", "cidx_survM",
+                                            "ICI", "E50", "E90",
+                                            "Emax", "RSB"),
+                               cause    = NULL,
+                               plot_tau = TRUE) {
   for (metric in metrics) {
     ylimit <- c(0, 1)
     df     <- agg[[metric]]
     if (!is.null(cause)) df <- df[df$cause == cause, , drop = FALSE]
-
+    
     tau <- tau_min <- tau_max <- tau_med <- tau_mu <- NULL
-
+    
     if (metric == "cidx_survM" && !is.null(agg$survM_eval)) {
       tau_df  <- agg$survM_eval
       tau_min <- min(tau_df$x[, "lwr"],    na.rm = TRUE)
@@ -942,14 +888,14 @@ plot_out_of_sample <- function(agg,
       tau_med <- unique(tau_df$x[, "median"])
       tau_mu  <- unique(tau_df$x[, "mean"])
     } else if (metric %in% c("bs", "auc", "cidx_pec",
-                              "ICI", "E50", "E90", "Emax", "RSB")) {
+                             "ICI", "E50", "E90", "Emax", "RSB")) {
       tau <- df$time
       if (length(unique(tau)) == 1L && metric == "cidx_pec") {
         df$model <- factor(df$model, levels = unique(df$model))
         p <- ggplot2::ggplot(df,
                              ggplot2::aes(x = model,
-                                         y = .data[["x"]][, "median"],
-                                         color = model)) +
+                                          y = .data[["x"]][, "median"],
+                                          color = model)) +
           ggplot2::geom_point(size = 3) +
           ggplot2::geom_errorbar(
             ggplot2::aes(ymin = .data[["x"]][, "lwr"],
@@ -964,7 +910,7 @@ plot_out_of_sample <- function(agg,
         next
       }
     }
-
+    
     p <- ggplot2::ggplot(df, ggplot2::aes(x = time,
                                           y = .data[["x"]][, "median"],
                                           group = model)) +
@@ -980,19 +926,19 @@ plot_out_of_sample <- function(agg,
                     color = "Model", fill = "Model") +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::theme(legend.position = "top")
-
+    
     if (plot_tau && metric == "cidx_survM" &&
         !is.null(tau_min) && !is.null(tau_max)) {
       p <- p + ggplot2::annotate("rect",
-                                  xmin = tau_min, xmax = tau_max,
-                                  ymin = -Inf, ymax = Inf,
-                                  fill = "grey90", alpha = 0.05)
+                                 xmin = tau_min, xmax = tau_max,
+                                 ymin = -Inf, ymax = Inf,
+                                 fill = "grey90", alpha = 0.05)
     }
     if (plot_tau && metric %in% c("bs", "auc", "cidx_pec",
-                                   "ICI", "E50", "E90", "Emax", "RSB") &&
+                                  "ICI", "E50", "E90", "Emax", "RSB") &&
         !is.null(tau)) {
       p <- p + ggplot2::geom_vline(xintercept = tau,
-                                    linetype = "dashed", color = "grey70")
+                                   linetype = "dashed", color = "grey70")
     }
     print(p)
   }
@@ -1013,18 +959,18 @@ summarize_outer_results <- function(results) {
   cfg_rows       <- list()
   ibs_rows       <- list()
   ibs_time_rows  <- list()
-
+  
   for (i in seq_along(results)) {
     r      <- results[[i]]
     fold   <- r$fold
     model  <- r$model_key
     times  <- as.numeric(r$times)
     causes <- r$metrics$causes
-
+    
     for (ci in seq_along(causes)) {
       k  <- causes[ci]
       nm <- paste0("cause_", k)
-
+      
       cfg_i  <- r$best_cfg[[nm]]
       cfg_df <- cbind(
         data.frame(fold = fold, model = model, cause = k,
@@ -1032,14 +978,14 @@ summarize_outer_results <- function(results) {
         as.data.frame(as.list(cfg_i), stringsAsFactors = FALSE)
       )
       cfg_rows[[length(cfg_rows) + 1L]] <- cfg_df
-
+      
       ibs_vec <- as.numeric(r$metrics$ibs_scores[[ci]])
       ibs_rows[[length(ibs_rows) + 1L]] <- data.frame(
         fold = fold, model = model, cause = k,
         ibs  = utils::tail(ibs_vec, 1L),
         stringsAsFactors = FALSE
       )
-
+      
       Tm     <- length(ibs_vec)
       t_used <- if (length(times) == Tm) times else seq_len(Tm)
       ibs_time_rows[[length(ibs_time_rows) + 1L]] <- data.frame(
@@ -1049,14 +995,14 @@ summarize_outer_results <- function(results) {
       )
     }
   }
-
+  
   rbindlist <- function(lst)
     do.call(rbind, lapply(lst, as.data.frame))
-
+  
   configs_per_cause  <- rbindlist(cfg_rows)
   ibs_per_fold_cause <- rbindlist(ibs_rows)
   ibs_per_time       <- rbindlist(ibs_time_rows)
-
+  
   ibs_summary <- if (nrow(ibs_per_fold_cause) > 0L) {
     key <- interaction(ibs_per_fold_cause$model,
                        ibs_per_fold_cause$cause, drop = TRUE)
@@ -1066,14 +1012,14 @@ summarize_outer_results <- function(results) {
     out <- do.call(rbind, stats)
     keys   <- names(spl)
     parts  <- read.table(text = keys, sep = ".",
-                          stringsAsFactors = FALSE,
-                          col.names = c("model", "cause"))
+                         stringsAsFactors = FALSE,
+                         col.names = c("model", "cause"))
     cbind(parts, as.data.frame(out, row.names = NULL))
   } else {
     data.frame(model = character(), cause = integer(),
                mean = numeric(), sd = numeric(), median = numeric())
   }
-
+  
   list(configs_per_cause  = configs_per_cause,
        ibs_per_fold_cause = ibs_per_fold_cause,
        ibs_per_time       = ibs_per_time,
@@ -1121,18 +1067,18 @@ get_results <- function(data_root,
   all_rmlt   <- list()
   oes        <- list()
   all_test_folds <- NULL
-
+  
   is_imputed <- grepl("imputed", dataset, fixed = TRUE)
   if (is_imputed && is.null(dataset_prior_imputation))
     stop("dataset_prior_imputation must be provided.", call. = FALSE)
-
+  
   models <- c(python_models, r_models)
-
+  
   for (model in models) {
     fold_dir <- file.path(data_root, dataset, model)
     res[[model]]      <- vector("list", outer_folds)
     res_rmlt[[model]] <- vector("list", outer_folds)
-
+    
     for (v in seq_len(outer_folds)) {
       cif_path  <- file.path(fold_dir, sprintf("outer_%d", v), "cif.parquet")
       test_path <- if (!is.null(dataset_prior_imputation))
@@ -1141,22 +1087,22 @@ get_results <- function(data_root,
       else
         file.path(data_root, dataset,
                   sprintf("outer_%d", v), "test.parquet")
-
+      
       df_cif  <- arrow::read_parquet(cif_path)
       df_test <- arrow::read_parquet(test_path)
-
+      
       times     <- sort(unique(df_cif$time))
       causes    <- sort(unique(df_cif$cause))
       n         <- nrow(df_test)
       K         <- length(causes)
       Tm        <- length(times)
       cause_idx <- cause_of_interest
-
+      
       if (!("row_id" %in% names(df_cif))) {
         stopifnot(n * K * Tm == nrow(df_cif))
         df_cif$row_id <- rep(df_test$row_id, each = Tm * K)
       }
-
+      
       if (model %in% python_models) {
         ord    <- order(match(df_cif$row_id, df_test$row_id),
                         df_cif$time, df_cif$cause)
@@ -1166,7 +1112,7 @@ get_results <- function(data_root,
       } else {
         out <- array(df_cif$cif, dim = c(n, K, Tm))
       }
-
+      
       if (sample_curves) {
         set.seed(seed)
         ids <- sample.int(n, min(20L, n))
@@ -1191,7 +1137,7 @@ get_results <- function(data_root,
           ggplot2::theme_minimal(base_size = 11)
         print(p)
       }
-
+      
       res[[model]][[v]] <- score_from_cifs(
         out        = out,
         test       = df_test,
@@ -1204,10 +1150,10 @@ get_results <- function(data_root,
         cens.method = "ipcw",
         cens.model  = "km"
       )
-
+      
       all_cifs[[model]][[v]] <- out
       all_test[[v]]          <- df_test
-
+      
       all_rmlt[[model]][[v]] <- compute_rmlt_from_cif(out, times,
                                                       tau = max(times))
       res_rmlt[[model]][[v]] <- score_from_rmlt(
@@ -1220,15 +1166,15 @@ get_results <- function(data_root,
         metrics    = "cidx_pec"
       )
     }
-
+    
     all_cifs[[model]] <- abind::abind(all_cifs[[model]], along = 1L)
     if (is.null(all_test_folds))
       all_test_folds <- do.call(rbind, all_test)
-
+    
     cause1      <- all_cifs[[model]][, cause_of_interest, ]
     horizon_idx <- which.min(abs(times - horizon))
     horizon_use <- times[horizon_idx]
-
+    
     plotFrame <- CalibrationPlot(
       model_name       = model,
       predictions      = cause1[, horizon_idx],
@@ -1243,16 +1189,16 @@ get_results <- function(data_root,
       graph            = TRUE
     )
     print(plotFrame$graphs)
-
+    
     col_name <- paste0("cif_cause", cause_of_interest, "_", model,
                        "_t", round(horizon_use, 1))
     all_test_folds[[col_name]] <- as.numeric(cause1[, horizon_idx])
     oes[[col_name]]            <- plotFrame$OE_summary
   }
-
+  
   predictor_cols <- paste0("cif_cause", cause_of_interest, "_",
                            models, "_t", round(horizon, 1))
-
+  
   list(all_test_folds = all_test_folds,
        predictor_cols = predictor_cols,
        all_cifs       = all_cifs,

@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 ## Overview
 
 **CompRisksBenchmaRk** provides a unified framework for benchmarking survival
-models in the presence of competing risks.  Its core features are:
+models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
   `fit` / `predict_cif` interface.
@@ -28,7 +28,7 @@ models in the presence of competing risks.  Its core features are:
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
   plots, O/E ratio, and decision curve analysis.
 - Built-in support for **multiple imputation** (median/mode or MICE) with
-  Rubin's-rules pooling of CIF predictions.
+  mean-pooling of CIF predictions across imputed datasets.
 
 Built-in models: `"FGR"`, `"FGRP"`, `"csCPH"`, `"RSF"`, `"VM_spline"`,
 `"VM_piecewise"`.
@@ -38,65 +38,70 @@ Built-in models: `"FGR"`, `"FGRP"`, `"csCPH"`, `"RSF"`, `"VM_spline"`,
 ## Installation
 
 ```r
-# From a local zip / source directory:
-install.packages("path/to/CompRisksBenchmaRk_0.1.0.tar.gz",
-                 repos = NULL, type = "source")
-
-# Or with devtools:
+# From a local source directory:
 devtools::install_local("path/to/CompRisksBenchmaRk")
 ```
 
 ---
 
-## 1  Simulate data
+## 1  Example data: `survival::pbc`
 
-`sim_cmprks()` generates a small competing risks dataset useful for
-exploration.
+We use the Mayo Clinic Primary Biliary Cholangitis (PBC) trial from the
+**survival** package. The endpoint has two competing outcomes:
 
-```{r simulate}
+- `status = 1` — liver transplant (cause 1)
+- `status = 2` — death (cause 2)
+- `status = 0` — censored
+
+Time is recorded in days; we convert to years for readability.
+
+```{r data}
 library(CompRisksBenchmaRk)
+library(survival)
 
-set.seed(42)
-dat <- sim_cmprks(n = 400, seed = 42)
+data(pbc, package = "survival")
+pbc2         <- pbc[!is.na(pbc$trt), ]         # randomised patients only
+pbc2$time    <- pbc2$time / 365.25              # days -> years
+pbc2$status  <- as.integer(pbc2$status)         # 0=censored,1=transplant,2=dead
 
-head(dat)
-table(dat$event)   # 0 = censored, 1 = cause 1, 2 = cause 2
+feature_cols <- c("age", "bili", "albumin", "protime", "platelet")
+pbc2         <- pbc2[, c("time", "status", feature_cols)]
+pbc2         <- pbc2[complete.cases(pbc2), ]
+
+table(pbc2$status)
+```
+
+Prepare the data frame (standardises column names and guards against zero
+minimum time):
+
+```{r prepare}
+dat <- prepare_data(pbc2, time_col = "time", event_col = "status")
+head(dat[, c("time", "event")])
 ```
 
 ---
 
 ## 2  The model registry
 
-All models are stored in a package-internal environment and accessed by a
-character key.
-
 ```{r registry}
-# See what is registered after loading the package
 list_cr_models()
-
-# Inspect a model's metadata
-mdl  <- get_cr_model("FGR")
-mdl$info()
+get_cr_model("FGR")$info()
 ```
 
 ### Registering a custom model
 
-Any model that can produce a CIF array `[n, K, Tm]` can be registered:
+Any model that returns a CIF array `[n, K, Tm]` can be added:
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-
   fit = function(x, y_time, y_event, args = list()) {
-    # ... train your model ...
     structure(list(fit = my_fit, causes = causes),
               class = c("cr_model_mymodel", "cr_model"))
   },
-
   predict_cif = function(fit_obj, x_new, times) {
-    # Return array dim c(nrow(x_new), K, length(times))
+    # return array dim c(nrow(x_new), K, length(times))
   },
-
   info = function() list(
     name         = "My Custom Model",
     supports     = "CIF",
@@ -111,107 +116,78 @@ register_cr_model(
 ## 3  Fit and predict manually
 
 ```{r fit-predict}
-library(survival)
+causes <- sort(unique(dat$event[dat$event != 0]))   # 1, 2
+times  <- seq(1, 10, by = 1)                         # years 1-10
 
-# Prepare data
-dat <- prepare_data(dat, time_col = "time", event_col = "event")
-
-causes <- sort(unique(dat$event[dat$event != 0]))
-times  <- quantile(dat$time[dat$event != 0], probs = seq(0.1, 0.9, by = 0.1))
-times  <- sort(unique(round(times, 2)))
-
-# Train / test split
 set.seed(1)
-idx_tr  <- sample(nrow(dat), 300)
-train   <- dat[ idx_tr, ]
-test    <- dat[-idx_tr, ]
+idx_tr <- sample(nrow(dat), floor(0.75 * nrow(dat)))
+train  <- dat[ idx_tr, ]
+test   <- dat[-idx_tr, ]
 
-feature_cols <- setdiff(names(dat), c("time", "event"))
+dm   <- remake_X(train, test, feature_cols)
+x_tr <- dm$x_train
+x_te <- dm$x_new
 
-# Build model matrices
-dm     <- remake_X(train, test, feature_cols)
-x_tr   <- dm$x_train
-x_te   <- dm$x_new
+mdl <- get_cr_model("FGR")
+fit <- mdl$fit(x = x_tr, y_time = train$time,
+               y_event = train$event, args = list())
 
-# Fit FGR
-mdl    <- get_cr_model("FGR")
-fit    <- mdl$fit(x = x_tr, y_time = train$time,
-                  y_event = train$event, args = list())
-
-# Predict CIFs  →  array [n_test, K, Tm]
-cif    <- mdl$predict_cif(fit, x_new = x_te, times = times)
-
-dim(cif)   # n_test × 2 causes × n_times
+cif <- mdl$predict_cif(fit, x_new = x_te, times = times)
+dim(cif)   # n_test x 2 causes x 10 times
 ```
 
 ---
 
 ## 4  Scoring
 
-`score_from_cifs()` wraps `riskRegression::Score`, `pec::cindex`, and the
-package's own calibration functions into a single call.
-
 ```{r scoring}
 scores <- score_from_cifs(
-  out        = cif,
-  test       = test,
-  times      = times,
-  causes     = causes,
-  metrics    = c("brier", "auc"),
-  summary    = "ibs"
+  out     = cif,
+  test    = test,
+  times   = times,
+  causes  = causes,
+  metrics = c("brier", "auc"),
+  summary = "ibs"
 )
 
-# IBS per cause
-scores$cause_ibs
-```
-
-### Brier score at individual time points
-
-```{r brier}
-# Per-time-point Brier score for cause 1
-scores$cause_bs$cause_1
+scores$cause_ibs           # IBS per cause
+scores$cause_bs$cause_2    # time-specific Brier score for death
 ```
 
 ---
 
 ## 5  Calibration
 
-`CalibrationPlot()` uses jackknife pseudovalues (Aalen-Johansen) smoothed by
-LOESS to assess calibration at a chosen horizon.
-
-```{r calibration, fig.alt="Calibration plot for cause 1"}
-horizon <- median(times)
-
-# Predictions at the horizon index
-hi      <- which.min(abs(times - horizon))
-pred_h  <- cif[, 1, hi]   # cause 1 predictions for all test subjects
+```{r calibration, fig.alt="Calibration plot for cause 2 (death) at 5 years"}
+horizon   <- 5
+hi        <- which.min(abs(times - horizon))
+pred_dead <- cif[, 2, hi]
 
 cal <- CalibrationPlot(
   model_name       = "FGR",
-  predictions      = pred_h,
+  predictions      = pred_dead,
   data             = test,
   time             = test$time,
   status           = test$event,
   tau              = horizon,
-  cause            = 1,
+  cause            = 2,
   predictions.type = "CIF",
   loess_smoothing  = TRUE,
   graph            = TRUE
 )
 
 print(cal$graphs[[1]])
-cal$calib.measures[[1]]   # ICI, E50, E90, Emax, RSB
-cal$OE_summary            # observed / expected ratio
+cal$calib.measures[[1]]    # ICI, E50, E90, Emax, RSB
+cal$OE_summary             # O/E ratio with 95% CI
 ```
 
 ---
 
 ## 6  Decision curve analysis
 
-```{r dca, fig.alt="Decision curve analysis"}
-# Add predictions as a column for ClinicalUtility
-test_dca <- test
-test_dca$pred_FGR <- pred_h
+```{r dca, fig.alt="Decision curve analysis for 5-year death risk"}
+test_dca          <- test
+test_dca$pred_FGR <- pred_dead
 
 du <- ClinicalUtility(
   data        = test_dca,
@@ -231,72 +207,58 @@ print(du$plot)
 
 ## 7  Nested cross-validation (benchmark workflow)
 
-When the benchmark directory layout has been produced by the companion Python
-pipeline, use `nested_cv_from_bench()`:
-
 ```{r nested-cv, eval = FALSE}
-# Run FGR on a pre-built benchmark directory
 results <- nested_cv_from_bench(
-  out_dir   = "path/to/BenchResults/my_dataset",
+  out_dir   = "path/to/BenchResults/pbc",
   model_key = "FGR",
   seed      = 123,
   verbose   = TRUE
 )
 
-# Run RSF with a hyperparameter grid
 results_rsf <- nested_cv_from_bench(
-  out_dir   = "path/to/BenchResults/my_dataset",
+  out_dir   = "path/to/BenchResults/pbc",
   model_key = "RSF",
-  grid      = list(
-    ntree    = c(200L, 500L),
-    nodesize = c(10L, 20L)
-  ),
-  seed    = 123,
-  verbose = TRUE
+  grid      = list(ntree = c(200L, 500L), nodesize = c(10L, 20L)),
+  seed      = 123,
+  verbose   = TRUE
 )
 ```
 
-After all models have been run, collect and score predictions with
-`get_results()`:
+After all models have been run, collect and score with `get_results()`:
 
 ```{r get-results, eval = FALSE}
 out <- get_results(
-  data_root        = "path/to/BenchResults",
-  dataset          = "my_dataset",
-  r_models         = c("FGR", "csCPH", "RSF"),
-  python_models    = c("DeepHit", "DeSurv"),
-  outer_folds      = 5,
-  horizon          = 3.0,
-  seed             = 42,
-  cause_of_interest = 1L,
-  sample_curves    = FALSE
+  data_root         = "path/to/BenchResults",
+  dataset           = "pbc",
+  r_models          = c("FGR", "csCPH", "RSF"),
+  python_models     = c("DeepHit", "DeSurv"),
+  outer_folds       = 5,
+  horizon           = 5.0,
+  seed              = 42,
+  cause_of_interest = 2L,
+  sample_curves     = FALSE
 )
 
-# Per-fold IBS for FGR, cause 1
-lapply(out$res$FGR, function(f) f$cause_ibs$cause_1)
+lapply(out$res$FGR, function(f) f$cause_ibs$cause_2)
 ```
 
 ---
 
 ## 8  Imputation
 
-`impute_split()` handles missing data before model fitting.  The method is
-learnt from the training set only, preventing data leakage.
-
 ```{r imputation, eval = FALSE}
 imp <- impute_split(
   train        = train,
   test         = test,
   feature_cols = feature_cols,
-  method       = "median_mode"   # or "mice" for multiple imputation
+  method       = "median_mode"    # or "mice" for multiple imputation
 )
 
-# For MICE (m > 1), pool predictions across imputed datasets:
 cif_list <- lapply(seq_len(imp$m), function(k) {
   dm_k <- remake_X(imp$imputations[[k]]$train,
                    imp$imputations[[k]]$test,
                    feature_cols)
-  fit_k <- mdl$fit(x = dm_k$x_train,
+  fit_k <- mdl$fit(x       = dm_k$x_train,
                    y_time  = imp$imputations[[k]]$train$time,
                    y_event = imp$imputations[[k]]$train$event)
   mdl$predict_cif(fit_k, dm_k$x_new, times)
