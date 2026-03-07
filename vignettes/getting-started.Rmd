@@ -30,8 +30,7 @@ models in the presence of competing risks. Its core features are:
 - Built-in support for **multiple imputation** (median/mode or MICE) with
   mean-pooling of CIF predictions across imputed datasets.
 
-Built-in models: `"FGR"`, `"FGRP"`, `"csCPH"`, `"RSF"`, `"VM_spline"`,
-`"VM_piecewise"`.
+Built-in models: `"FGR"`, `"FGRP"`, `"csCPH"`, `"RSF"`.
 
 ---
 
@@ -109,6 +108,7 @@ register_cr_model(
     default_grid = function() tibble::tibble()
   )
 )
+get_cr_model("MyModel")$info()
 ```
 
 ---

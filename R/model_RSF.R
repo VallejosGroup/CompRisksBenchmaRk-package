@@ -13,67 +13,49 @@ NULL
 
 register_cr_model(
   key = "RSF",
-
+  
   fit = function(x, y_time, y_event, args = list()) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
-
-    x       <- as.data.frame(x)
-    y_time  <- as.numeric(y_time)
-    y_event <- as.integer(as.character(y_event))
-    causes  <- sort(unique(y_event[y_event != 0L]))
-
-    ntree     <- if (!is.null(args$ntree))     args$ntree     else 500L
-    mtry      <- if (!is.null(args$mtry))      args$mtry      else NULL
-    nodesize  <- if (!is.null(args$nodesize))  args$nodesize  else NULL
-    splitrule <- if (!is.null(args$splitrule)) args$splitrule else "logrankCR"
-
-    dat    <- data.frame(time = y_time, event = y_event, x,
-                         check.names = FALSE)
-    covars <- setdiff(names(dat), c("time", "event"))
-    f_full <- stats::reformulate(covars, response = NULL)
-    f_full <- stats::update(f_full, survival::Surv(time, event) ~ .)
-
+    
+    inp   <- cr_prepare_inputs(x, y_time, y_event)
+    built <- cr_build_formula(inp$x, inp$y_time, inp$y_event, "Surv")
+    
     fits <- randomForestSRC::rfsrc(
-      formula   = f_full,
-      data      = dat,
-      ntree     = ntree,
-      mtry      = mtry,
-      nodesize  = nodesize,
-      splitrule = splitrule
+      formula   = built$formula,
+      data      = built$dat,
+      ntree     = cr_arg(args, "ntree",     500L),
+      mtry      = cr_arg(args, "mtry",      NULL),
+      nodesize  = cr_arg(args, "nodesize",  NULL),
+      splitrule = cr_arg(args, "splitrule", "logrankCR")
     )
-    structure(list(causes = causes, fits = fits),
+    structure(list(causes = inp$causes, fits = fits),
               class = c("cr_model_rsf", "cr_model"))
   },
-
+  
   predict_cif = function(fit_obj, x_new, times) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
-
-    x_new <- as.data.frame(x_new)
-    times <- as.numeric(times)
-    pr    <- randomForestSRC::predict.rfsrc(fit_obj$fit,
-                                            newdata = x_new)
+    
+    p       <- cr_init_cif_array(fit_obj, x_new, times)
+    pr      <- randomForestSRC::predict.rfsrc(fit_obj$fits, newdata = p$x_new)
     train_t <- pr$time.interest
-    n       <- nrow(x_new)
-    K       <- length(fit_obj$causes)
-    out     <- array(0, dim = c(n, K, length(times)))
-
-    for (k in seq_len(K)) {
+    
+    for (k in seq_len(p$K)) {
       cif_mat <- as.matrix(pr$cif[, , k, drop = FALSE][,, 1L])
-      for (i in seq_len(n)) {
-        out[i, k, ] <- stats::approx(
+      for (i in seq_len(p$n)) {
+        p$out[i, k, ] <- stats::approx(
           x    = train_t,
           y    = cif_mat[i, ],
-          xout = times,
+          xout = p$times,
           rule = 2,
           ties = "ordered"
         )$y
       }
     }
-    out
+    p$out
   },
-
+  
   info = function() list(
     name         = "Random Survival Forest (CR) \u2014 randomForestSRC::rfsrc",
     supports     = "CIF",

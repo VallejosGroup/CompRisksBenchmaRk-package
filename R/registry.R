@@ -17,7 +17,7 @@
 NULL
 
 # Internal environment that stores all registered models.
-.survbench_env <- new.env(parent = emptyenv())
+.cr_models <- new.env(parent = emptyenv())
 
 #' Register a competing risks model
 #'
@@ -53,20 +53,11 @@ register_cr_model <- function(key, fit, predict_cif, info) {
   stopifnot(is.character(key), length(key) == 1L, nzchar(key))
   stopifnot(is.function(fit), is.function(predict_cif), is.function(info))
   
-  if (!exists(".cr_models", envir = .survbench_env, inherits = FALSE)) {
-    assign(".cr_models", new.env(parent = emptyenv()),
-           envir = .survbench_env)
-  }
-  
-  if (exists(key, envir = .survbench_env$.cr_models, inherits = FALSE)) {
+  if (exists(key, envir = .cr_models, inherits = FALSE))
     warning("Overwriting registered model: ", key, call. = FALSE)
-  }
   
-  assign(
-    key,
-    list(fit = fit, predict_cif = predict_cif, info = info),
-    envir = .survbench_env$.cr_models
-  )
+  assign(key, list(fit = fit, predict_cif = predict_cif, info = info),
+         envir = .cr_models)
   
   invisible(TRUE)
 }
@@ -85,9 +76,7 @@ register_cr_model <- function(key, fit, predict_cif, info) {
 #' mdl$info()
 #' }
 get_cr_model <- function(key) {
-  if (!exists(".cr_models", envir = .survbench_env, inherits = FALSE))
-    stop("No models have been registered yet.", call. = FALSE)
-  m <- get0(key, envir = .survbench_env$.cr_models, inherits = FALSE)
+  m <- get0(key, envir = .cr_models, inherits = FALSE)
   if (is.null(m)) stop("Model not registered: ", key, call. = FALSE)
   m
 }
@@ -100,12 +89,4 @@ get_cr_model <- function(key) {
 #'
 #' @examples
 #' list_cr_models()
-list_cr_models <- function() {
-  if (!exists(".cr_models", envir = .survbench_env, inherits = FALSE))
-    return(character(0L))
-  ls(envir = .survbench_env$.cr_models)
-}
-
-#' @rdname list_cr_models
-#' @export
-list_models <- list_cr_models
+list_cr_models <- function() ls(envir = .cr_models)

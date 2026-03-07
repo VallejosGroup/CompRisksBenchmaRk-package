@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{trapezoidal.integration}
 \alias{trapezoidal.integration}
-\title{Trapezoidal numerical integration}
+\title{Simulate a competing risks dataset}
 \usage{
 trapezoidal.integration(x, y)
 }
@@ -10,10 +10,27 @@ trapezoidal.integration(x, y)
 \item{x}{Numeric vector of x-values (must be sorted).}
 
 \item{y}{Numeric vector of y-values (same length as `x`).}
+
+\item{n}{Number of subjects (default 30 000).}
+
+\item{p_block}{Number of covariates per linear predictor block
+(default 4).}
+
+\item{gammas}{Shared coefficient magnitude for all blocks (default 10).}
+
+\item{cens_frac}{Fraction of subjects to be censored (default 0.5).}
+
+\item{cap}{Optional symmetric cap applied to the linear predictor to
+avoid numerical overflow.}
+
+\item{seed}{Random seed (default 123).
+
+Trapezoidal numerical integration}
 }
 \value{
 A single numeric value.
 }
 \description{
-Trapezoidal numerical integration
+Generates synthetic data following a DeepHit-like data-generating
+process with two competing causes and configurable covariate blocks.
 }
