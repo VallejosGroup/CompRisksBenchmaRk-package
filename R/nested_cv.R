@@ -6,6 +6,7 @@ NULL
 
 # ---- internal helpers --------------------------------------------------------
 
+#' @noRd
 read_bench_parquet <- function(path, schema) {
   df <- apply_data_types(
     as.data.frame(arrow::read_parquet(path)),
@@ -18,6 +19,7 @@ read_bench_parquet <- function(path, schema) {
   df
 }
 
+#' @noRd
 detect_m_from_dir <- function(dir) {
   f  <- list.files(dir, pattern = "^train_imp_[0-9]+\\.parquet$",
                    full.names = FALSE)
@@ -31,6 +33,7 @@ detect_m_from_dir <- function(dir) {
   length(ks)
 }
 
+#' @noRd
 load_outer_data <- function(fold_dir, schema) {
   if (file.exists(file.path(fold_dir, "train_imp_1.parquet")) &&
       file.exists(file.path(fold_dir, "test_imp_1.parquet"))) {
@@ -50,18 +53,19 @@ load_outer_data <- function(fold_dir, schema) {
             test  = read_bench_parquet(te_path, schema)))
 }
 
+#' @noRd
 load_inner_data <- function(fold_dir, schema, outer_train_df) {
   inner_dir  <- file.path(fold_dir, "inner")
   inner_dirs <- if (dir.exists(inner_dir)) {
     dd <- list.dirs(inner_dir, recursive = FALSE, full.names = TRUE)
     dd[grepl("fold_[0-9]+$", basename(dd))]
   } else character(0L)
-
+  
   if (!length(inner_dirs))
     return(list(inner_dirs = inner_dirs, inner_data = list()))
-
+  
   inner_data <- vector("list", length(inner_dirs))
-
+  
   for (j in seq_along(inner_dirs)) {
     idir <- inner_dirs[j]
     if (file.exists(file.path(idir, "train_imp_1.parquet")) &&
@@ -86,7 +90,7 @@ load_inner_data <- function(fold_dir, schema, outer_train_df) {
       val   = outer_train_df[va_ids, , drop = FALSE]
     ))
   }
-
+  
   list(inner_dirs = inner_dirs, inner_data = inner_data)
 }
 
@@ -122,32 +126,32 @@ load_inner_data <- function(fold_dir, schema, outer_train_df) {
 #'   only), and `metrics` (`causes`, `cause_bs`, `cause_ibs`).
 #' @export
 nested_cv_from_bench <- function(out_dir                = "../BenchResults",
-                                  model_key,
-                                  grid                   = NULL,
-                                  seed                   = 123L,
-                                  verbose                = TRUE,
-                                  drop_cols_after_impute = NULL) {
-
+                                 model_key,
+                                 grid                   = NULL,
+                                 seed                   = 123L,
+                                 verbose                = TRUE,
+                                 drop_cols_after_impute = NULL) {
+  
   manifest_path <- file.path(out_dir, "manifest.json")
   times_path    <- file.path(out_dir, "times.json")
   schema_path   <- file.path(out_dir, "data_types.json")
-
+  
   man    <- jsonlite::fromJSON(manifest_path, simplifyVector = TRUE)
   times  <- sort(unique(as.numeric(
     jsonlite::fromJSON(times_path, simplifyVector = TRUE)
   )))
   schema <- jsonlite::fromJSON(schema_path, simplifyVector = TRUE)
-
+  
   outer_folds  <- as.integer(man$outer_folds)
   inner_folds  <- as.integer(man$inner_folds)
   feature_cols <- setdiff(man$features, "row_id")
   if (!is.null(drop_cols_after_impute))
     feature_cols <- setdiff(feature_cols, drop_cols_after_impute)
-
+  
   mdl      <- get_cr_model(model_key)
   meta     <- mdl$info()
   has_grid <- isTRUE(meta$needs_tuning)
-
+  
   if (has_grid) {
     if (is.null(grid))
       stop("Model '", model_key, "' requires tuning; please supply a `grid`.")
@@ -165,20 +169,20 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       cat("Outer folds:", outer_folds, "\n")
     }
   }
-
+  
   results <- vector("list", outer_folds)
-
+  
   for (v in seq_len(outer_folds)) {
     fold_dir   <- file.path(out_dir, sprintf("outer_%d", v))
     outer_data <- load_outer_data(fold_dir, schema)
     m_outer    <- length(outer_data)
-
+    
     train  <- outer_data[[1L]]$train
     test   <- outer_data[[1L]]$test
     causes <- sort(unique(train$event[train$event != 0L]))
-
+    
     set.seed(seed + v)
-
+    
     # ---- no tuning ----
     if (!has_grid) {
       cif_list <- vector("list", m_outer)
@@ -195,11 +199,11 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       pred  <- pool_cifs_mean(cif_list)
       perf  <- score_from_cifs(out = pred, test = test,
                                times = times, causes = causes)
-
+      
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
       save_cif_r(store_dir, cif = pred, times = times,
                  row_ids = rownames(test), causes = causes)
-
+      
       results[[v]] <- list(
         fold      = v,
         model_key = model_key,
@@ -209,28 +213,28 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                          cause_ibs = perf$cause_ibs)
       )
       if (verbose) cat("[outer", v, "] done (no tuning) \n")
-
-    # ---- with tuning ----
+      
+      # ---- with tuning ----
     } else {
       inner_loaded <- load_inner_data(fold_dir, schema,
                                       outer_train_df = train)
       inner_dirs   <- inner_loaded$inner_dirs
       inner_data   <- inner_loaded$inner_data
-
+      
       cfg_scores <- sapply(seq_along(grid_list), function(gi) {
         cfg <- grid_list[[gi]]
         if (verbose)
           cat("[outer", v, "] grid", gi, "/", length(grid_list), ":",
               paste(names(cfg), cfg, collapse = " "), "\n")
-
+        
         inner_vals <- matrix(NA_real_,
                              nrow = length(causes), ncol = inner_folds)
-
+        
         for (j in seq_along(inner_dirs)) {
           jj       <- inner_data[[j]]
           m_inner  <- length(jj)
           cif_list <- vector("list", m_inner)
-
+          
           for (m in seq_len(m_inner)) {
             tr_m <- jj[[m]]$train
             va_m <- jj[[m]]$val
@@ -241,12 +245,12 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                               args    = cfg)
             cif_list[[m]] <- mdl$predict_cif(fit_in, dm$x_new, times)
           }
-
+          
           cif_in  <- pool_cifs_mean(cif_list)
           val_ref <- jj[[1L]]$val
           perf_in <- score_from_cifs(out = cif_in, test = val_ref,
                                      times = times, causes = causes)
-
+          
           for (ci in seq_along(causes)) {
             kk <- causes[ci]
             inner_vals[ci, j] <- utils::tail(
@@ -256,10 +260,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         }
         inner_vals
       })
-
+      
       ncause <- length(causes)
       ngrids <- length(grid_list)
-
+      
       cfg_mat <- array(as.vector(cfg_scores),
                        dim = c(ncause, inner_folds, ngrids),
                        dimnames = list(
@@ -271,22 +275,22 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       best_idx <- apply(cfg_av, 1L, which.min)
       best_cfg <- mapply(function(i) grid_list[[i]], best_idx,
                          SIMPLIFY = FALSE)
-
+      
       pred <- array(NA_real_, dim = c(nrow(test), ncause, length(times)))
-
+      
       frgp_details <- identical(model_key, "FGRP")
       if (frgp_details) {
         store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
         dir.create(store_dir, recursive = TRUE, showWarnings = FALSE)
       }
-
+      
       for (ci in seq_along(causes)) {
         kk    <- causes[ci]
         cfg_i <- best_cfg[[paste0("cause_", kk)]]
         cif_list  <- vector("list", m_outer)
         coef_list <- if (frgp_details) vector("list", m_outer) else NULL
         fit_list  <- if (frgp_details) vector("list", m_outer) else NULL
-
+        
         for (mii in seq_len(m_outer)) {
           tr_k <- outer_data[[mii]]$train
           te_k <- outer_data[[mii]]$test
@@ -301,10 +305,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
             coef_list[[mii]] <- extract_fgrp_coefs(fit_i, tol = 1e-8)
           }
         }
-
+        
         pred_i          <- pool_cifs_mean(cif_list)
         pred[, ci, ]    <- pred_i[, ci, ]
-
+        
         if (verbose)
           cat("[outer", v, "] best cfg idx:",
               best_idx[paste0("cause_", kk)],
@@ -312,7 +316,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
               sprintf("%.6f", cfg_av[paste0("cause_", kk),
                                      paste0("cfg_", best_idx[paste0("cause_", kk)])]),
               " cause:", kk, "\n")
-
+        
         if (frgp_details) {
           store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
           saveRDS(cfg_i,
@@ -329,14 +333,14 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                            row.names = FALSE)
         }
       }
-
+      
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
       save_cif_r(store_dir, cif = pred, times = times,
                  row_ids = rownames(test), causes = causes)
-
+      
       perf <- score_from_cifs(out = pred, test = test,
                               times = times, causes = causes)
-
+      
       results[[v]] <- list(
         fold      = v,
         model_key = model_key,
@@ -349,5 +353,3 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
   }
   results
 }
-
-

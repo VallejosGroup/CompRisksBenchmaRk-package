@@ -52,22 +52,22 @@ NULL
 register_cr_model <- function(key, fit, predict_cif, info) {
   stopifnot(is.character(key), length(key) == 1L, nzchar(key))
   stopifnot(is.function(fit), is.function(predict_cif), is.function(info))
-
+  
   if (!exists(".cr_models", envir = .survbench_env, inherits = FALSE)) {
     assign(".cr_models", new.env(parent = emptyenv()),
            envir = .survbench_env)
   }
-
+  
   if (exists(key, envir = .survbench_env$.cr_models, inherits = FALSE)) {
     warning("Overwriting registered model: ", key, call. = FALSE)
   }
-
+  
   assign(
     key,
     list(fit = fit, predict_cif = predict_cif, info = info),
     envir = .survbench_env$.cr_models
   )
-
+  
   invisible(TRUE)
 }
 
@@ -105,3 +105,7 @@ list_cr_models <- function() {
     return(character(0L))
   ls(envir = .survbench_env$.cr_models)
 }
+
+#' @rdname list_cr_models
+#' @export
+list_models <- list_cr_models
