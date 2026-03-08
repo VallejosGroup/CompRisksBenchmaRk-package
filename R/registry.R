@@ -4,9 +4,9 @@
 #' A lightweight registry that maps string keys to model objects.  Each
 #' registered model must expose three functions:
 #' \describe{
-#'   \item{fit}{`fit(x, y_time, y_event, args)` — trains the model and returns
-#'     a model object.}
-#'   \item{predict_cif}{`predict_cif(fit_obj, x_new, times)` — returns a
+#'   \item{fit}{`fit(data, formula, args)` — trains the model on a data frame
+#'     with a model formula and returns a fitted model object.}
+#'   \item{predict_cif}{`predict_cif(fit_obj, newdata, times)` — returns a
 #'     3-D array of cumulative incidence function (CIF) predictions with
 #'     dimensions `[n, K, |times|]`.}
 #'   \item{info}{`info()` — returns a named list with at least `name`,
@@ -25,9 +25,10 @@ NULL
 #' by key and used inside [nested_cv_from_bench()].
 #'
 #' @param key A single non-empty character string used to identify the model.
-#' @param fit A function with signature `fit(x, y_time, y_event, args)`.
+#' @param fit A function with signature `fit(data, formula, args)` where
+#'   `data` is a data frame and `formula` is a model formula.
 #' @param predict_cif A function with signature
-#'   `predict_cif(fit_obj, x_new, times)` that returns a 3-D numeric array
+#'   `predict_cif(fit_obj, newdata, times)` that returns a 3-D numeric array
 #'   of dimensions `[n, K, Tm]`.
 #' @param info A zero-argument function returning a named list with fields
 #'   `name`, `supports`, `needs_tuning`, and `default_grid`.
@@ -38,11 +39,11 @@ NULL
 #' @examples
 #' register_cr_model(
 #'   key = "my_model",
-#'   fit = function(x, y_time, y_event, args = list()) {
-#'     list(intercept = mean(y_time))
+#'   fit = function(data, formula, args = list()) {
+#'     list(intercept = mean(data[[all.vars(formula)[1L]]]))
 #'   },
-#'   predict_cif = function(fit_obj, x_new, times) {
-#'     n <- nrow(x_new); K <- 1; Tm <- length(times)
+#'   predict_cif = function(fit_obj, newdata, times) {
+#'     n <- nrow(newdata); K <- 1; Tm <- length(times)
 #'     array(0.1, dim = c(n, K, Tm))
 #'   },
 #'   info = function() list(name = "Trivial model", supports = "CIF",
@@ -85,12 +86,12 @@ get_cr_model <- function(key) {
 #' Predict cumulative incidence functions for a registered model
 #'
 #' A thin wrapper around a model's `predict_cif` function that coerces
-#' `x_new` to a data frame and `times` to numeric before dispatching,
+#' `newdata` to a data frame and `times` to numeric before dispatching,
 #' so individual model implementations do not need to repeat this.
 #'
 #' @param key Character string identifying a registered model.
 #' @param fit_obj A fitted model object returned by the model's `fit` function.
-#' @param x_new Feature matrix or data frame for new observations.
+#' @param newdata Data frame of new observations.
 #' @param times Numeric vector of evaluation times.
 #'
 #' @return A 3-D numeric array of dimensions `[n, K, length(times)]`.
@@ -98,14 +99,14 @@ get_cr_model <- function(key) {
 #'
 #' @examples
 #' \dontrun{
-#' fit <- get_cr_model("FGR")$fit(x_train, y_time, y_event)
-#' cif <- predict_cif("FGR", fit, x_test, times)
+#' fit <- get_cr_model("FGR")$fit(train_data, formula, args = list())
+#' cif <- predict_cif("FGR", fit, newdata = test_data, times)
 #' }
-predict_cif <- function(key, fit_obj, x_new, times) {
-  mdl   <- get_cr_model(key)
-  x_new <- if (is.data.frame(x_new)) x_new else as.data.frame(x_new)
-  times <- as.numeric(times)
-  mdl$predict_cif(fit_obj, x_new, times)
+predict_cif <- function(key, fit_obj, newdata, times) {
+  mdl     <- get_cr_model(key)
+  newdata <- if (is.data.frame(newdata)) newdata else as.data.frame(newdata)
+  times   <- as.numeric(times)
+  mdl$predict_cif(fit_obj, newdata, times)
 }
 
 

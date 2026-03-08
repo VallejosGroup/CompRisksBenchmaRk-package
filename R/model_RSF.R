@@ -14,33 +14,31 @@ NULL
 register_cr_model(
   key = "RSF",
 
-  fit = function(x, y_time, y_event, args = list()) {
+  fit = function(data, formula, args = list()) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
-    inp   <- cr_prepare_inputs(x, time = y_time, event = y_event)
-    built <- cr_build_formula(inp$x, inp$time, inp$event, "Surv")
-
-    fits <- randomForestSRC::rfsrc(
-      formula   = built$formula,
-      data      = built$dat,
+    causes <- cr_causes(data, formula)
+    fits   <- randomForestSRC::rfsrc(
+      formula   = formula,
+      data      = data,
       ntree     = cr_arg(args, "ntree",     500L),
       mtry      = cr_arg(args, "mtry",      NULL),
       nodesize  = cr_arg(args, "nodesize",  NULL),
       splitrule = cr_arg(args, "splitrule", "logrankCR")
     )
-    structure(list(causes = inp$causes, fits = fits),
+    structure(list(causes = causes, fits = fits),
               class = c("cr_model_rsf", "cr_model"))
   },
 
-  predict_cif = function(fit_obj, x_new, times) {
+  predict_cif = function(fit_obj, newdata, times) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
-    n       <- nrow(x_new)
+    n       <- nrow(newdata)
     K       <- length(fit_obj$causes)
     out     <- array(0, dim = c(n, K, length(times)))
-    pr      <- randomForestSRC::predict.rfsrc(fit_obj$fits, newdata = x_new)
+    pr      <- randomForestSRC::predict.rfsrc(fit_obj$fits, newdata = newdata)
     train_t <- pr$time.interest
 
     for (k in seq_len(K)) {

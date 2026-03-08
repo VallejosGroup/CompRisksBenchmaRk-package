@@ -9,10 +9,11 @@ register_cr_model(key, fit, predict_cif, info)
 \arguments{
 \item{key}{A single non-empty character string used to identify the model.}
 
-\item{fit}{A function with signature `fit(x, y_time, y_event, args)`.}
+\item{fit}{A function with signature `fit(data, formula, args)` where
+`data` is a data frame and `formula` is a model formula.}
 
 \item{predict_cif}{A function with signature
-`predict_cif(fit_obj, x_new, times)` that returns a 3-D numeric array
+`predict_cif(fit_obj, newdata, times)` that returns a 3-D numeric array
 of dimensions `[n, K, Tm]`.}
 
 \item{info}{A zero-argument function returning a named list with fields
@@ -28,11 +29,11 @@ by key and used inside [nested_cv_from_bench()].
 \examples{
 register_cr_model(
   key = "my_model",
-  fit = function(x, y_time, y_event, args = list()) {
-    list(intercept = mean(y_time))
+  fit = function(data, formula, args = list()) {
+    list(intercept = mean(data[[all.vars(formula)[1L]]]))
   },
-  predict_cif = function(fit_obj, x_new, times) {
-    n <- nrow(x_new); K <- 1; Tm <- length(times)
+  predict_cif = function(fit_obj, newdata, times) {
+    n <- nrow(newdata); K <- 1; Tm <- length(times)
     array(0.1, dim = c(n, K, Tm))
   },
   info = function() list(name = "Trivial model", supports = "CIF",

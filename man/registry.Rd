@@ -7,9 +7,9 @@
 A lightweight registry that maps string keys to model objects.  Each
 registered model must expose three functions:
 \describe{
-  \item{fit}{`fit(x, y_time, y_event, args)` — trains the model and returns
-    a model object.}
-  \item{predict_cif}{`predict_cif(fit_obj, x_new, times)` — returns a
+  \item{fit}{`fit(data, formula, args)` — trains the model on a data frame
+    with a model formula and returns a fitted model object.}
+  \item{predict_cif}{`predict_cif(fit_obj, newdata, times)` — returns a
     3-D array of cumulative incidence function (CIF) predictions with
     dimensions `[n, K, |times|]`.}
   \item{info}{`info()` — returns a named list with at least `name`,
