@@ -61,7 +61,7 @@ library(survival)
 data(pbc, package = "survival")
 pbc2        <- pbc[!is.na(pbc$trt), ]         # randomised patients only
 pbc2$time   <- pbc2$time / 365.25             # days -> years
-pbc2$status <- as.integer(pbc2$status)        # 0=censored, 1=transplant, 2=dead
+pbc2$status <- as.integer(as.character(pbc2$status))  # 0=censored, 1=transplant, 2=dead
 
 feature_cols <- c("age", "bili", "albumin", "protime", "platelet")
 pbc2         <- pbc2[, c("time", "status", feature_cols)]
@@ -152,7 +152,7 @@ causes <- sort(unique(dat$event[dat$event != 0]))   # 1, 2
 scores <- score_from_cifs(
   out     = cif,
   test    = test,
-  time_grid   = time_grid,
+  times   = time_grid,
   causes  = causes,
   metrics = c("brier", "auc"),
   summary = "ibs"
