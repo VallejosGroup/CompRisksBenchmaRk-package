@@ -17,10 +17,13 @@ NULL
 #'   `y_event` (integer), and `causes` (sorted integer vector).
 #' @noRd
 cr_prepare_inputs <- function(x, y_time, y_event) {
-  x       <- as.data.frame(x)
-  y_time  <- as.numeric(y_time)
-  y_event <- as.integer(as.character(y_event))
-  causes  <- sort(unique(y_event[y_event != 0L]))
+  if (!is.data.frame(x))
+    x <- as.data.frame(x)
+  if (!is.numeric(y_time))
+    stop("`y_time` must be a numeric vector.", call. = FALSE)
+  if (!is.integer(y_event))
+    y_event <- as.integer(as.character(y_event))
+  causes <- sort(unique(y_event[y_event != 0]))
   list(x = x, y_time = y_time, y_event = y_event, causes = causes)
 }
 
