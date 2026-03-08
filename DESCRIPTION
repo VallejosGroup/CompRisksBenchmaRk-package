@@ -55,9 +55,13 @@ VignetteBuilder: knitr
 URL: https://github.com/VallejosGroup/CompRisksBenchmark
 BugReports: https://github.com/VallejosGroup/CompRisksBenchmark/issues
 Collate:
+    'utils_registry.R'
     'registry.R'
-    'model_helpers.R'
-    'utils.R'
+    'data_prep.R'
+    'cv_splits.R'
+    'imputation.R'
+    'cif_io.R'
+    'scoring.R'
     'metrics.R'
     'nested_cv.R'
     'model_FGR.R'

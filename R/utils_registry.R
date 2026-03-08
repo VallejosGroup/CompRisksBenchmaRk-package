@@ -1,7 +1,12 @@
-#' @title Internal helpers shared across model registrations
-#' @name model_helpers
+#' @title Internal registry utilities
+#' @description Internal environment storing registered models, and helper
+#'   functions shared across model registrations.
+#' @name utils_registry
 #' @keywords internal
 NULL
+
+# Internal environment that stores all registered models.
+.cr_models <- new.env(parent = emptyenv())
 
 
 #' Extract competing causes from a data frame

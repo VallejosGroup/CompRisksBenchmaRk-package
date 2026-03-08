@@ -18,9 +18,6 @@
 #' @name registry
 NULL
 
-# Internal environment that stores all registered models.
-.cr_models <- new.env(parent = emptyenv())
-
 #' Register a competing risks model
 #'
 #' Adds (or replaces) a model in the internal registry so it can be retrieved
