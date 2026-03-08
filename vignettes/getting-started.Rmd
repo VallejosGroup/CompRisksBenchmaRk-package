@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
-  `fit(data, time_var, event_var, args)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
+  `fit(data, time_var, event_var, args, ...)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
 - A **nested cross-validation** engine (`nested_cv_from_bench`) that reads the
   pre-built benchmark directory layout produced by the companion Python pipeline.
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
@@ -89,16 +89,16 @@ get_cr_model("FGR")$info()
 
 ### Registering a custom model
 
-Any model whose `fit` accepts `(data, time_var, event_var, args)` and whose
+Any model whose `fit` accepts `(data, time_var, event_var, args, ...)` and whose
 `predict_cif` returns a `[n, K, Tm]` array can be registered.
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-  fit = function(data, time_var, event_var, args = list()) {
+  fit = function(data, time_var, event_var, args = list(), ...) {
     causes <- cr_causes(data, event_var)
     # ... train model ...
-    structure(list(causes = causes, fit = my_fit),
+    structure(list(causes = causes, fit = my_fit, model_key = "MyModel"),
               class = c("cr_model_mymodel", "cr_model"))
   },
   predict_cif = function(fit_obj, newdata, time_grid) {
@@ -135,7 +135,6 @@ mdl <- get_cr_model("FGR")
 fit <- mdl$fit(data      = train,
                time_var  = "time",
                event_var = "event",
-               args      = list())
 
 # predict_cif() wrapper coerces newdata and time_grid before dispatching
 cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
@@ -278,7 +277,6 @@ cif_list <- lapply(seq_len(imp$m), function(k) {
   fit_k <- mdl$fit(data      = tr_k,
                    time_var  = "time",
                    event_var = "event",
-                   args      = list())
   mdl$predict_cif(fit_k, newdata = te_k, time_grid = time_grid)
 })
 

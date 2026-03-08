@@ -14,7 +14,7 @@ NULL
 register_cr_model(
   key = "RSF",
 
-  fit = function(data, time_var, event_var, args = list()) {
+  fit = function(data, time_var, event_var, args = list(), ...) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
@@ -29,9 +29,10 @@ register_cr_model(
       ntree     = if (!is.null(args$ntree))     args$ntree     else 500L,
       mtry      = if (!is.null(args$mtry))      args$mtry      else NULL,
       nodesize  = if (!is.null(args$nodesize))  args$nodesize  else NULL,
-      splitrule = if (!is.null(args$splitrule)) args$splitrule else "logrankCR"
+      splitrule = if (!is.null(args$splitrule)) args$splitrule else "logrankCR",
+      ...
     )
-    structure(list(causes = causes, fits = fits),
+    structure(list(causes = causes, fits = fits, model_key = "RSF"),
               class = c("cr_model_rsf", "cr_model"))
   },
 

@@ -193,10 +193,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       for (m in seq_len(m_outer)) {
         tr_m <- outer_data[[m]]$train
         te_m <- outer_data[[m]]$test
-        fit  <- mdl$fit(data    = tr_m,
+        fit  <- mdl$fit(data      = tr_m,
                         time_var  = time_var,
                         event_var = event_var,
-                        args    = list())
+                        args      = list())
         cif_list[[m]] <- mdl$predict_cif(fit, newdata = te_m, time_grid = times)
       }
       pred  <- pool_cifs_mean(cif_list)

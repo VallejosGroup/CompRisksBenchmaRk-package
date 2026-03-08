@@ -4,9 +4,10 @@
 #' A lightweight registry that maps string keys to model objects.  Each
 #' registered model must expose three functions:
 #' \describe{
-#'   \item{fit}{`fit(data, time_var, event_var, args)` — trains the model on a
+#'   \item{fit}{`fit(data, time_var, event_var, args, ...)` — trains the model on a
 #'     data frame, using `time_var` and `event_var` to identify the time and
-#'     event columns.}
+#'     event columns. Grid parameters are passed via `args`; any additional
+#'     arguments for the underlying fitting function can be passed via `...`.}
 #'   \item{predict_cif}{`predict_cif(fit_obj, newdata, time_grid)` — returns a
 #'     3-D array of cumulative incidence function (CIF) predictions with
 #'     dimensions `[n, K, |time_grid|]`.}
@@ -26,9 +27,11 @@ NULL
 #' by key and used inside [nested_cv_from_bench()].
 #'
 #' @param key A single non-empty character string used to identify the model.
-#' @param fit A function with signature `fit(data, time_var, event_var, args)`
-#'   where `data` is a data frame and `time_var` / `event_var` are character
-#'   strings naming the respective columns.
+#' @param fit A function with signature `fit(data, time_var, event_var, args, ...)`
+#'   where `data` is a data frame, `time_var` / `event_var` are character
+#'   strings naming the respective columns, `args` is a named list of
+#'   grid-tuned arguments, and `...` accepts any further arguments passed
+#'   directly to the underlying fitting function.
 #' @param predict_cif A function with signature
 #'   `predict_cif(fit_obj, newdata, time_grid)` that returns a 3-D numeric array
 #'   of dimensions `[n, K, Tm]`.
@@ -41,8 +44,8 @@ NULL
 #' @examples
 #' register_cr_model(
 #'   key = "my_model",
-#'   fit = function(data, time_var, event_var, args = list()) {
-#'     list(intercept = mean(data[[time_var]]))
+#'   fit = function(data, time_var, event_var, args = list(), ...) {
+#'     list(intercept = mean(data[[time_var]]), model_key = "my_model")
 #'   },
 #'   predict_cif = function(fit_obj, newdata, time_grid) {
 #'     n <- nrow(newdata); K <- 1; Tm <- length(time_grid)
@@ -59,14 +62,7 @@ register_cr_model <- function(key, fit, predict_cif, info) {
   if (exists(key, envir = .cr_models, inherits = FALSE))
     warning("Overwriting registered model: ", key, call. = FALSE)
 
-  # Wrap fit so every returned object carries model_key automatically
-  fit_wrapped <- function(data, time_var, event_var, args = list()) {
-    fit_obj <- fit(data, time_var, event_var, args)
-    fit_obj$model_key <- key
-    fit_obj
-  }
-
-  assign(key, list(fit = fit_wrapped, predict_cif = predict_cif, info = info),
+  assign(key, list(fit = fit, predict_cif = predict_cif, info = info),
          envir = .cr_models)
 
   invisible(TRUE)
@@ -96,8 +92,8 @@ get_cr_model <- function(key) {
 #'
 #' A thin wrapper around a model's `predict_cif` function that coerces
 #' `newdata` to a data frame and `time_grid` to numeric before dispatching.
-#' The registered model is looked up from `fit_obj$model_key`, which is
-#' stamped onto every fitted object automatically by [register_cr_model()].
+#' The registered model is looked up from `fit_obj$model_key`, which each
+#' model's `fit` function stores in the returned object via `structure()`.
 #'
 #' @param fit_obj A fitted model object returned by the model's `fit` function.
 #' @param newdata Data frame of new observations.

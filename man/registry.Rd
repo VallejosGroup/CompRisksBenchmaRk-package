@@ -7,9 +7,10 @@
 A lightweight registry that maps string keys to model objects.  Each
 registered model must expose three functions:
 \describe{
-  \item{fit}{`fit(data, time_var, event_var, args)` — trains the model on a
+  \item{fit}{`fit(data, time_var, event_var, args, ...)` — trains the model on a
     data frame, using `time_var` and `event_var` to identify the time and
-    event columns.}
+    event columns. Grid parameters are passed via `args`; any additional
+    arguments for the underlying fitting function can be passed via `...`.}
   \item{predict_cif}{`predict_cif(fit_obj, newdata, time_grid)` — returns a
     3-D array of cumulative incidence function (CIF) predictions with
     dimensions `[n, K, |time_grid|]`.}

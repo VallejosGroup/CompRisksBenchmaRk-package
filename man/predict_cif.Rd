@@ -19,8 +19,8 @@ A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
 \description{
 A thin wrapper around a model's `predict_cif` function that coerces
 `newdata` to a data frame and `time_grid` to numeric before dispatching.
-The registered model is looked up from `fit_obj$model_key`, which is
-stamped onto every fitted object automatically by [register_cr_model()].
+The registered model is looked up from `fit_obj$model_key`, which each
+model's `fit` function stores in the returned object via `structure()`.
 }
 \examples{
 \dontrun{

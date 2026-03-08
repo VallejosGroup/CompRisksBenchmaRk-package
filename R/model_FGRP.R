@@ -15,7 +15,7 @@ NULL
 register_cr_model(
   key = "FGRP",
 
-  fit = function(data, time_var, event_var, args = list()) {
+  fit = function(data, time_var, event_var, args = list(), ...) {
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
 
@@ -39,7 +39,8 @@ register_cr_model(
         nlambda     = 1L,
         lambda      = as.numeric(lambda),
         standardize = if (!is.null(args$standardize)) args$standardize else TRUE,
-        alpha       = if (!is.null(args$alpha))       args$alpha       else 0
+        alpha       = if (!is.null(args$alpha))       args$alpha       else 0,
+        ...
       )
       if (!is.null(fp[["coef"]]) &&
           length(fp[["coef"]]) == length(x_cols)) {
@@ -50,7 +51,7 @@ register_cr_model(
       list(fp = fp)
     })
 
-    structure(list(causes = causes, fits = fits, x_cols = x_cols),
+    structure(list(causes = causes, fits = fits, x_cols = x_cols, model_key = "FGRP"),
               class = c("cr_model_fgrp", "cr_model"))
   },
 

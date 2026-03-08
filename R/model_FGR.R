@@ -18,7 +18,7 @@ NULL
 register_cr_model(
   key = "FGR",
 
-  fit = function(data, time_var, event_var, args = list()) {
+  fit = function(data, time_var, event_var, args = list(), ...) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
@@ -30,9 +30,9 @@ register_cr_model(
                  response = paste0("prodlim::Hist(", time_var, ", ", event_var, ")"))
 
     fits <- lapply(causes, function(k) {
-      riskRegression::FGR(formula, data = data, cause = k)
+      riskRegression::FGR(formula, data = data, cause = k, ...)
     })
-    structure(list(causes = causes, fits = fits),
+    structure(list(causes = causes, fits = fits, model_key = "FGR"),
               class = c("cr_model_fgr", "cr_model"))
   },
 
