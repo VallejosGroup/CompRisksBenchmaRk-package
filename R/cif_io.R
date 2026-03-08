@@ -17,8 +17,8 @@ NULL
 pool_cifs_mean <- function(cif_list) {
   m      <- length(cif_list)
   pooled <- cif_list[[1]]
-  if (m > 1L)
-    for (i in 2L:m) pooled <- pooled + cif_list[[i]]
+  if (m > 1)
+    for (i in 2:m) pooled <- pooled + cif_list[[i]]
   pooled / m
 }
 
@@ -39,17 +39,17 @@ remake_X <- function(train_df, new_df, feature_cols) {
   tr <- train_df[, feature_cols, drop = FALSE]
   nw <- new_df[,  feature_cols, drop = FALSE]
 
-  fcols <- names(tr)[vapply(tr, is.factor, logical(1L))]
+  fcols <- names(tr)[vapply(tr, is.factor, logical(1))]
   for (cn in fcols)
     nw[[cn]] <- factor(nw[[cn]], levels = levels(tr[[cn]]))
 
   tt    <- stats::terms(~ ., data = tr)
   mf_tr <- stats::model.frame(tt, data = tr, na.action = stats::na.pass)
-  X_tr  <- stats::model.matrix(tt, data = mf_tr)[, -1L, drop = FALSE]
+  X_tr  <- stats::model.matrix(tt, data = mf_tr)[, -1, drop = FALSE]
 
   tt    <- stats::terms(~ ., data = nw)
   mf_nw <- stats::model.frame(tt, data = nw, na.action = stats::na.pass)
-  X_nw  <- stats::model.matrix(tt, data = mf_nw)[, -1L, drop = FALSE]
+  X_nw  <- stats::model.matrix(tt, data = mf_nw)[, -1, drop = FALSE]
 
   colnames(X_tr) <- make.names(colnames(X_tr), unique = TRUE)
   colnames(X_nw) <- make.names(colnames(X_nw), unique = TRUE)
@@ -61,13 +61,13 @@ remake_X <- function(train_df, new_df, feature_cols) {
                          dimnames = list(NULL, miss)))
   X_nw <- X_nw[, colnames(X_tr), drop = FALSE]
 
-  keep_var <- apply(X_tr, 2L, function(z) stats::sd(z) > 0)
+  keep_var <- apply(X_tr, 2, function(z) stats::sd(z) > 0)
   if (any(!keep_var)) {
     X_tr <- X_tr[, keep_var, drop = FALSE]
     X_nw <- X_nw[, keep_var, drop = FALSE]
   }
 
-  if (ncol(X_tr) > 0L) {
+  if (ncol(X_tr) > 0) {
     q   <- qr(X_tr)
     piv <- q$pivot[seq_len(q$rank)]
     X_tr <- X_tr[, piv, drop = FALSE]
@@ -112,7 +112,7 @@ build_store_paths_r <- function(out_dir, model, fold) {
 #' @return Invisibly `NULL`.
 #' @export
 save_cif_r <- function(out_dir, cif, times, row_ids, causes) {
-  n  <- dim(cif)[1L]; K <- dim(cif)[2L]; Tm <- dim(cif)[3L]
+  n  <- dim(cif)[1]; K <- dim(cif)[2]; Tm <- dim(cif)[3]
   df <- data.frame(
     row_id = rep(row_ids, each = K * Tm),
     cause  = rep(rep(causes, each = Tm), times = n),

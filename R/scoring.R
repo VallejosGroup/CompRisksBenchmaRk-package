@@ -15,7 +15,7 @@ NULL
 trapezoidal.integration <- function(x, y) {
   if (length(x) != length(y))
     stop("`x` and `y` must have the same length.")
-  sum(diff(x) * (utils::head(y, -1L) + utils::tail(y, -1L)) / 2)
+  sum(diff(x) * (utils::head(y, -1) + utils::tail(y, -1)) / 2)
 }
 
 
@@ -31,10 +31,10 @@ trapezoidal.integration <- function(x, y) {
 #' @export
 compute_rmlt_from_cif <- function(out, times, tau = max(times)) {
   d     <- dim(out)
-  n     <- d[1L]; K <- d[2L]
+  n     <- d[1]; K <- d[2]
   idx_t <- which(times <= tau)
 
-  if (length(idx_t) < 2L) {
+  if (length(idx_t) < 2) {
     res <- matrix(0, nrow = n, ncol = K)
     colnames(res) <- paste0("cause_", seq_len(K))
     return(res)
@@ -44,7 +44,7 @@ compute_rmlt_from_cif <- function(out, times, tau = max(times)) {
   res <- matrix(NA_real_, nrow = n, ncol = K)
   for (k in seq_len(K)) {
     cif_mat  <- matrix(out[, k, idx_t, drop = FALSE], nrow = n)
-    res[, k] <- apply(cif_mat, 1L,
+    res[, k] <- apply(cif_mat, 1,
                        trapezoidal.integration, x = times_use)
   }
   colnames(res) <- paste0("cause_", seq_len(K))
@@ -164,14 +164,14 @@ get_results <- function(data_root,
                         df_cif$time, df_cif$cause)
         df_cif <- df_cif[ord, , drop = FALSE]
         stopifnot(length(df_cif$cif) == n * K * Tm)
-        out <- aperm(array(df_cif$cif, dim = c(K, Tm, n)), c(3L, 1L, 2L))
+        out <- aperm(array(df_cif$cif, dim = c(K, Tm, n)), c(3, 1, 2))
       } else {
         out <- array(df_cif$cif, dim = c(n, K, Tm))
       }
 
       if (sample_curves) {
         set.seed(seed)
-        ids <- sample.int(n, min(20L, n))
+        ids <- sample.int(n, min(20, n))
         mat <- out[ids, cause_idx, ]
         p   <- ggplot2::ggplot(
           data.frame(
@@ -223,7 +223,7 @@ get_results <- function(data_root,
       )
     }
 
-    all_cifs[[model]] <- abind::abind(all_cifs[[model]], along = 1L)
+    all_cifs[[model]] <- abind::abind(all_cifs[[model]], along = 1)
     if (is.null(all_test_folds))
       all_test_folds <- do.call(rbind, all_test)
 
@@ -239,7 +239,7 @@ get_results <- function(data_root,
       status           = all_test_folds$event,
       tau              = horizon_use,
       cause            = cause_of_interest,
-      cens.code        = 0L,
+      cens.code        = 0,
       loess_smoothing  = TRUE,
       predictions.type = "CIF",
       graph            = TRUE
@@ -306,7 +306,7 @@ summarize_out_of_sample <- function(results, num_causes, times) {
           list(ICI = NA_real_, E50 = NA_real_, E90 = NA_real_,
                Emax = NA_real_, RSB = NA_real_)
 
-        tab[[length(tab) + 1L]] <- data.frame(
+        tab[[length(tab) + 1]] <- data.frame(
           model      = model,
           fold       = v,
           cause      = cause,
@@ -314,8 +314,8 @@ summarize_out_of_sample <- function(results, num_causes, times) {
           ibs        = ibs,
           auc        = auc,
           cidx_pec   = cidx_pec,
-          cidx_survM = cidx_survM[[1L]],
-          survM_eval = cidx_survM[[2L]],
+          cidx_survM = cidx_survM[[1]],
+          survM_eval = cidx_survM[[2]],
           ICI        = calib_meas[["ICI"]],
           E50        = calib_meas[["E50"]],
           E90        = calib_meas[["E90"]],
@@ -397,7 +397,7 @@ plot_out_of_sample <- function(agg,
     } else if (metric %in% c("bs", "auc", "cidx_pec",
                               "ICI", "E50", "E90", "Emax", "RSB")) {
       tau <- df$time
-      if (length(unique(tau)) == 1L && metric == "cidx_pec") {
+      if (length(unique(tau)) == 1 && metric == "cidx_pec") {
         df$model <- factor(df$model, levels = unique(df$model))
         p <- ggplot2::ggplot(df,
                              ggplot2::aes(x = model,
@@ -484,18 +484,18 @@ summarize_outer_results <- function(results) {
                    stringsAsFactors = FALSE),
         as.data.frame(as.list(cfg_i), stringsAsFactors = FALSE)
       )
-      cfg_rows[[length(cfg_rows) + 1L]] <- cfg_df
+      cfg_rows[[length(cfg_rows) + 1]] <- cfg_df
 
       ibs_vec <- as.numeric(r$metrics$ibs_scores[[ci]])
-      ibs_rows[[length(ibs_rows) + 1L]] <- data.frame(
+      ibs_rows[[length(ibs_rows) + 1]] <- data.frame(
         fold = fold, model = model, cause = k,
-        ibs  = utils::tail(ibs_vec, 1L),
+        ibs  = utils::tail(ibs_vec, 1),
         stringsAsFactors = FALSE
       )
 
       Tm     <- length(ibs_vec)
       t_used <- if (length(times) == Tm) times else seq_len(Tm)
-      ibs_time_rows[[length(ibs_time_rows) + 1L]] <- data.frame(
+      ibs_time_rows[[length(ibs_time_rows) + 1]] <- data.frame(
         fold = fold, model = model, cause = k,
         time = t_used, ibs = ibs_vec,
         stringsAsFactors = FALSE
@@ -510,7 +510,7 @@ summarize_outer_results <- function(results) {
   ibs_per_fold_cause <- rbindlist(ibs_rows)
   ibs_per_time       <- rbindlist(ibs_time_rows)
 
-  ibs_summary <- if (nrow(ibs_per_fold_cause) > 0L) {
+  ibs_summary <- if (nrow(ibs_per_fold_cause) > 0) {
     key <- interaction(ibs_per_fold_cause$model,
                        ibs_per_fold_cause$cause, drop = TRUE)
     spl <- split(ibs_per_fold_cause$ibs, key)

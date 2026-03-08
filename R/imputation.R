@@ -132,9 +132,9 @@ impute_mice <- function(train, test, feature_cols, m, maxit, seed,
 #' @export
 impute_split <- function(train, test, feature_cols,
                           method = c("none", "median_mode", "mice"),
-                          m      = 1L,
-                          maxit  = 100L,
-                          seed   = 1L,
+                          m      = 1,
+                          maxit  = 100,
+                          seed   = 1,
                           drop_cols_after_impute = NULL) {
   method <- match.arg(method)
 
@@ -144,7 +144,7 @@ impute_split <- function(train, test, feature_cols,
   }
 
   if (!split_detect_NA(train, test, feature_cols) || method == "none") {
-    return(list(m = 1L, imputations = list(list(train = train, test = test))))
+    return(list(m = 1, imputations = list(list(train = train, test = test))))
   }
 
   if (method == "median_mode") {
@@ -153,7 +153,7 @@ impute_split <- function(train, test, feature_cols,
       feature_cols = feature_cols,
       drop_cols_after_impute = drop_cols_after_impute
     )
-    return(list(m = 1L,
+    return(list(m = 1,
                 imputations = list(list(train = imp$train, test = imp$test))))
   }
 
@@ -188,9 +188,9 @@ impute_split <- function(train, test, feature_cols,
 #' @export
 build_imputation_cache <- function(out_dir                = "../BenchResults",
                                     impute_method          = c("mice", "median_mode"),
-                                    seed                   = 123L,
-                                    m                      = 1L,
-                                    maxit                  = 20L,
+                                    seed                   = 123,
+                                    m                      = 1,
+                                    maxit                  = 20,
                                     drop_cols_after_impute = NULL,
                                     overwrite              = FALSE,
                                     verbose                = TRUE) {
@@ -262,7 +262,7 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
     imp_outer <- impute_split(
       train = train, test = test, feature_cols = feature_cols,
       drop_cols_after_impute = drop_cols_after_impute,
-      method = impute_method, m = m, maxit = maxit, seed = seed + 1000L + v
+      method = impute_method, m = m, maxit = maxit, seed = seed + 1000 + v
     )
     write_imp_pair(imp_outer, out_fold_cache, test_prefix = "test")
 
@@ -294,7 +294,7 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
         train = train_in, test = val_in, feature_cols = feature_cols,
         drop_cols_after_impute = drop_cols_after_impute,
         method = impute_method, m = m, maxit = maxit,
-        seed = seed + 2000L + v * 100L + j
+        seed = seed + 2000 + v * 100 + j
       )
       write_imp_pair(imp_inner, in_cache_dir, test_prefix = "val")
     }

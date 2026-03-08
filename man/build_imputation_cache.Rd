@@ -7,9 +7,9 @@
 build_imputation_cache(
   out_dir = "../BenchResults",
   impute_method = c("mice", "median_mode"),
-  seed = 123L,
-  m = 1L,
-  maxit = 20L,
+  seed = 123,
+  m = 1,
+  maxit = 20,
   drop_cols_after_impute = NULL,
   overwrite = FALSE,
   verbose = TRUE

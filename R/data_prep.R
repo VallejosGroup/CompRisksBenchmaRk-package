@@ -67,7 +67,7 @@ infer_data_types <- function(df, feature_cols,
                    else                      "character"
   }
 
-  list(version = 1L, core_cols = core_cols,
+  list(version = 1, core_cols = core_cols,
        feature_cols = feature_cols, types = as.list(types))
 }
 

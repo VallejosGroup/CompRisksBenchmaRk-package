@@ -36,7 +36,7 @@ register_cr_model(
         formula     = frm_k,
         data        = data,
         penalty     = if (!is.null(args$penalty))     args$penalty     else "LASSO",
-        nlambda     = 1L,
+        nlambda     = 1,
         lambda      = as.numeric(lambda),
         standardize = if (!is.null(args$standardize)) args$standardize else TRUE,
         alpha       = if (!is.null(args$alpha))       args$alpha       else 0,
@@ -64,7 +64,7 @@ register_cr_model(
       fp    <- fit_obj$fits[[k]]$fp
       X     <- as.matrix(newdata[, fit_obj$x_cols, drop = FALSE])
       beta  <- as.vector(fp[["coef"]])
-      bfitj <- fp[["breslowJump"]][[2L]]
+      bfitj <- fp[["breslowJump"]][[2]]
       tt    <- as.vector(fp[["uftime"]])
 
       H0       <- cumsum(bfitj)

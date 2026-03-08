@@ -9,9 +9,9 @@ impute_split(
   test,
   feature_cols,
   method = c("none", "median_mode", "mice"),
-  m = 1L,
-  maxit = 100L,
-  seed = 1L,
+  m = 1,
+  maxit = 100,
+  seed = 1,
   drop_cols_after_impute = NULL
 )
 }

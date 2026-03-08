@@ -26,7 +26,7 @@ register_cr_model(
     fits <- randomForestSRC::rfsrc(
       formula   = formula,
       data      = data,
-      ntree     = if (!is.null(args$ntree))     args$ntree     else 500L,
+      ntree     = if (!is.null(args$ntree))     args$ntree     else 500,
       mtry      = if (!is.null(args$mtry))      args$mtry      else NULL,
       nodesize  = if (!is.null(args$nodesize))  args$nodesize  else NULL,
       splitrule = if (!is.null(args$splitrule)) args$splitrule else "logrankCR",
@@ -47,7 +47,7 @@ register_cr_model(
     train_t <- pr$time.interest
 
     for (k in seq_len(K)) {
-      cif_mat <- as.matrix(pr$cif[, , k, drop = FALSE][,, 1L])
+      cif_mat <- as.matrix(pr$cif[, , k, drop = FALSE][,, 1])
       for (i in seq_len(n)) {
         out[i, k, ] <- stats::approx(
           x    = train_t,
@@ -66,7 +66,7 @@ register_cr_model(
     supports     = "CIF",
     needs_tuning = TRUE,
     default_grid = function() tibble::tibble(
-      ntree     = 500L,
+      ntree     = 500,
       nodesize  = list(NULL),
       mtry      = list(NULL),
       splitrule = "logrankCR"

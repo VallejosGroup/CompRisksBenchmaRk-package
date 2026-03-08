@@ -53,7 +53,7 @@ NULL
 #'                          default_grid = function() tibble::tibble())
 #' )
 register_cr_model <- function(key, fit, predict_cif, info) {
-  stopifnot(is.character(key), length(key) == 1L, nzchar(key))
+  stopifnot(is.character(key), length(key) == 1, nzchar(key))
   stopifnot(is.function(fit), is.function(predict_cif), is.function(info))
 
   if (exists(key, envir = .cr_models, inherits = FALSE))
