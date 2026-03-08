@@ -17,37 +17,39 @@ NULL
 
 register_cr_model(
   key = "FGR",
-  
+
   fit = function(x, y_time, y_event, args = list()) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
       stop("Please install 'prodlim'.")
-    
+
     inp    <- cr_prepare_inputs(x, time = y_time, event = y_event)
     built  <- cr_build_formula(inp$x, inp$time, inp$event, "Hist")
-    
+
     fits <- lapply(inp$causes, function(k) {
       riskRegression::FGR(built$formula, data = built$dat, cause = k)
     })
     structure(list(causes = inp$causes, fits = fits),
               class = c("cr_model_fgr", "cr_model"))
   },
-  
+
   predict_cif = function(fit_obj, x_new, times) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
-    
-    p <- cr_init_cif_array(fit_obj, x_new, times)
-    for (j in seq_len(p$K)) {
+
+    n   <- nrow(x_new)
+    K   <- length(fit_obj$causes)
+    out <- array(0, dim = c(n, K, length(times)))
+    for (j in seq_len(K)) {
       pj <- riskRegression::predictRisk(fit_obj$fits[[j]],
-                                        newdata = p$x_new,
-                                        times   = p$times)
-      p$out[, j, ] <- as.matrix(pj)
+                                        newdata = x_new,
+                                        times   = times)
+      out[, j, ] <- as.matrix(pj)
     }
-    p$out
+    out
   },
-  
+
   info = function() list(
     name         = "Fine-Gray (riskRegression::FGR)",
     supports     = "CIF",

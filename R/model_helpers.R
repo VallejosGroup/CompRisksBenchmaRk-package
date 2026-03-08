@@ -48,30 +48,11 @@ cr_build_formula <- function(x, time, event, response = c("Hist", "Surv")) {
   covars <- setdiff(names(dat), c("time", "event"))
   f      <- stats::reformulate(covars, response = NULL)
   lhs    <- switch(response,
-                   Hist = quote(prodlim::Hist(time, event)),
-                   Surv = quote(survival::Surv(time, event))
+    Hist = quote(prodlim::Hist(time, event)),
+    Surv = quote(survival::Surv(time, event))
   )
   formula <- stats::update(f, paste(deparse(lhs), "~ ."))
   list(dat = dat, formula = formula)
-}
-
-
-#' Initialise the output CIF array and coerce prediction inputs
-#'
-#' @param fit_obj A fitted model object with an element `causes`.
-#' @param x_new Feature matrix or data frame for new observations.
-#' @param times Numeric vector of evaluation times.
-#'
-#' @return A named list with elements `out` (zero-filled array of dim
-#'   `[n, K, Tm]`), `x_new` (data.frame), `times` (numeric), `n`, and `K`.
-#' @noRd
-cr_init_cif_array <- function(fit_obj, x_new, times) {
-  x_new <- as.data.frame(x_new)
-  times <- as.numeric(times)
-  n     <- nrow(x_new)
-  K     <- length(fit_obj$causes)
-  out   <- array(0, dim = c(n, K, length(times)))
-  list(out = out, x_new = x_new, times = times, n = n, K = K)
 }
 
 

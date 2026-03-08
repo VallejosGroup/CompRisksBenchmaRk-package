@@ -14,21 +14,21 @@ NULL
 
 register_cr_model(
   key = "FGRP",
-  
+
   fit = function(x, y_time, y_event, args = list()) {
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
-    
+
     inp    <- cr_prepare_inputs(x, time = y_time, event = y_event)
     x_cols <- names(inp$x)
-    
+
     built  <- cr_build_formula(inp$x, inp$time, inp$event, "Hist")
     covars <- setdiff(names(built$dat), c("time", "event"))
-    
+
     lambda <- cr_arg(args, "lambda_seq", NULL)
     if (is.null(lambda))
       stop("FGRP: lambda_seq must be provided via the grid.")
-    
+
     fits <- lapply(inp$causes, function(k) {
       frm_k <- stats::as.formula(paste0(
         "fastcmprsk::Crisk(time, event, cencode=0, failcode=", k, ") ~ ",
@@ -51,32 +51,34 @@ register_cr_model(
       }
       list(fp = fp)
     })
-    
+
     structure(list(causes = inp$causes, fits = fits, x_cols = x_cols),
               class = c("cr_model_fgrp", "cr_model"))
   },
-  
+
   predict_cif = function(fit_obj, x_new, times) {
-    p <- cr_init_cif_array(fit_obj, x_new, times)
-    
-    for (k in seq_len(p$K)) {
+    n   <- nrow(x_new)
+    K   <- length(fit_obj$causes)
+    out <- array(0, dim = c(n, K, length(times)))
+
+    for (k in seq_len(K)) {
       fp    <- fit_obj$fits[[k]]$fp
-      X     <- as.matrix(p$x_new[, !names(p$x_new) %in%
-                                   c("time", "event", "row_id")])
+      X     <- as.matrix(x_new[, !names(x_new) %in%
+                                  c("time", "event", "row_id")])
       beta  <- as.vector(fp[["coef"]])
       bfitj <- fp[["breslowJump"]][[2L]]
       tt    <- as.vector(fp[["uftime"]])
-      
+
       H0       <- cumsum(bfitj)
-      H0_times <- stats::approx(x = tt, y = H0, xout = p$times,
-                                method = "constant", f = 0, rule = 2)$y
+      H0_times <- stats::approx(x = tt, y = H0, xout = times,
+                                 method = "constant", f = 0, rule = 2)$y
       eta  <- drop(X %*% beta)
       lhat <- as.matrix(H0_times) %*% t(exp(eta))
-      p$out[, k, ] <- t(1 - exp(-lhat))
+      out[, k, ] <- t(1 - exp(-lhat))
     }
-    p$out
+    out
   },
-  
+
   info = function() list(
     name         = "Penalized Fine-Gray \u2014 fastcmprsk::fastCrrp",
     supports     = "CIF",
