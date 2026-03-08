@@ -18,16 +18,16 @@ NULL
 register_cr_model(
   key = "FGR",
 
-  fit = function(data, time.var, event.var, args = list()) {
+  fit = function(data, time_var, event_var, args = list()) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
       stop("Please install 'prodlim'.")
 
-    causes  <- cr_causes(data, event.var)
-    covars  <- setdiff(names(data), c(time.var, event.var))
+    causes  <- cr_causes(data, event_var)
+    covars  <- setdiff(names(data), c(time_var, event_var))
     formula <- stats::reformulate(covars,
-                 response = paste0("prodlim::Hist(", time.var, ", ", event.var, ")"))
+                 response = paste0("prodlim::Hist(", time_var, ", ", event_var, ")"))
 
     fits <- lapply(causes, function(k) {
       riskRegression::FGR(formula, data = data, cause = k)
@@ -36,17 +36,17 @@ register_cr_model(
               class = c("cr_model_fgr", "cr_model"))
   },
 
-  predict_cif = function(fit_obj, newdata, times) {
+  predict_cif = function(fit_obj, newdata, time_grid) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
 
     n   <- nrow(newdata)
     K   <- length(fit_obj$causes)
-    out <- array(0, dim = c(n, K, length(times)))
+    out <- array(0, dim = c(n, K, length(time_grid)))
     for (j in seq_len(K)) {
       pj <- riskRegression::predictRisk(fit_obj$fits[[j]],
                                         newdata = newdata,
-                                        times   = times)
+                                        times   = time_grid)
       out[, j, ] <- as.matrix(pj)
     }
     out

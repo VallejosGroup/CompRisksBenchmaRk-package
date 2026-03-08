@@ -15,12 +15,12 @@ NULL
 register_cr_model(
   key = "FGRP",
 
-  fit = function(data, time.var, event.var, args = list()) {
+  fit = function(data, time_var, event_var, args = list()) {
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
 
-    causes <- cr_causes(data, event.var)
-    x_cols <- setdiff(names(data), c(time.var, event.var, "row_id"))
+    causes <- cr_causes(data, event_var)
+    x_cols <- setdiff(names(data), c(time_var, event_var, "row_id"))
 
     lambda <- args$lambda_seq
     if (is.null(lambda))
@@ -28,7 +28,7 @@ register_cr_model(
 
     fits <- lapply(causes, function(k) {
       frm_k <- stats::as.formula(paste0(
-        "fastcmprsk::Crisk(", time.var, ", ", event.var,
+        "fastcmprsk::Crisk(", time_var, ", ", event_var,
         ", cencode=0, failcode=", k, ") ~ ",
         paste(x_cols, collapse = " + ")
       ))
@@ -54,10 +54,10 @@ register_cr_model(
               class = c("cr_model_fgrp", "cr_model"))
   },
 
-  predict_cif = function(fit_obj, newdata, times) {
+  predict_cif = function(fit_obj, newdata, time_grid) {
     n   <- nrow(newdata)
     K   <- length(fit_obj$causes)
-    out <- array(0, dim = c(n, K, length(times)))
+    out <- array(0, dim = c(n, K, length(time_grid)))
 
     for (k in seq_len(K)) {
       fp    <- fit_obj$fits[[k]]$fp
@@ -67,7 +67,7 @@ register_cr_model(
       tt    <- as.vector(fp[["uftime"]])
 
       H0       <- cumsum(bfitj)
-      H0_times <- stats::approx(x = tt, y = H0, xout = times,
+      H0_times <- stats::approx(x = tt, y = H0, xout = time_grid,
                                  method = "constant", f = 0, rule = 2)$y
       eta  <- drop(X %*% beta)
       lhat <- as.matrix(H0_times) %*% t(exp(eta))

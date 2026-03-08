@@ -149,8 +149,8 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
     feature_cols <- setdiff(feature_cols, drop_cols_after_impute)
 
   # Time and event variable names — standardised by prepare_data()
-  time.var  <- "time"
-  event.var <- "event"
+  time_var  <- "time"
+  event_var <- "event"
 
   mdl      <- get_cr_model(model_key)
   meta     <- mdl$info()
@@ -194,10 +194,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         tr_m <- outer_data[[m]]$train
         te_m <- outer_data[[m]]$test
         fit  <- mdl$fit(data    = tr_m,
-                        time.var  = time.var,
-                        event.var = event.var,
+                        time_var  = time_var,
+                        event_var = event_var,
                         args    = list())
-        cif_list[[m]] <- mdl$predict_cif(fit, newdata = te_m, times)
+        cif_list[[m]] <- mdl$predict_cif(fit, newdata = te_m, time_grid = times)
       }
       pred  <- pool_cifs_mean(cif_list)
       perf  <- score_from_cifs(out = pred, test = test,
@@ -242,10 +242,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
             tr_m   <- jj[[m]]$train
             va_m   <- jj[[m]]$val
             fit_in <- mdl$fit(data      = tr_m,
-                              time.var  = time.var,
-                              event.var = event.var,
+                              time_var  = time_var,
+                              event_var = event_var,
                               args      = cfg)
-            cif_list[[m]] <- mdl$predict_cif(fit_in, newdata = va_m, times)
+            cif_list[[m]] <- mdl$predict_cif(fit_in, newdata = va_m, time_grid = times)
           }
 
           cif_in  <- pool_cifs_mean(cif_list)
@@ -297,10 +297,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           tr_k  <- outer_data[[mii]]$train
           te_k  <- outer_data[[mii]]$test
           fit_i <- mdl$fit(data      = tr_k,
-                           time.var  = time.var,
-                           event.var = event.var,
+                           time_var  = time_var,
+                           event_var = event_var,
                            args      = cfg_i)
-          cif_list[[mii]] <- mdl$predict_cif(fit_i, newdata = te_k, times)
+          cif_list[[mii]] <- mdl$predict_cif(fit_i, newdata = te_k, time_grid = times)
           if (frgp_details) {
             fit_list[[mii]]  <- fit_i
             coef_list[[mii]] <- extract_fgrp_coefs(fit_i, tol = 1e-8)

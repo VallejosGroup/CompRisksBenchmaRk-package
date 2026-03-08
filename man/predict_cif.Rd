@@ -4,28 +4,28 @@
 \alias{predict_cif}
 \title{Predict cumulative incidence functions for a registered model}
 \usage{
-predict_cif(fit_obj, newdata, times)
+predict_cif(fit_obj, newdata, time_grid)
 }
 \arguments{
 \item{fit_obj}{A fitted model object returned by the model's `fit` function.}
 
 \item{newdata}{Data frame of new observations.}
 
-\item{times}{Numeric vector of evaluation times.}
+\item{time_grid}{Numeric vector of evaluation time_grid.}
 }
 \value{
-A 3-D numeric array of dimensions `[n, K, length(times)]`.
+A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
 }
 \description{
 A thin wrapper around a model's `predict_cif` function that coerces
-`newdata` to a data frame and `times` to numeric before dispatching.
+`newdata` to a data frame and `time_grid` to numeric before dispatching.
 The registered model is looked up from `fit_obj$model_key`, which is
 stamped onto every fitted object automatically by [register_cr_model()].
 }
 \examples{
 \dontrun{
-fit <- get_cr_model("FGR")$fit(train, time.var = "time",
-                               event.var = "event", args = list())
-cif <- predict_cif(fit, newdata = test, times = times)
+fit <- get_cr_model("FGR")$fit(train, time_var = "time",
+                               event_var = "event", args = list())
+cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
 }
 }

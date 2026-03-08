@@ -14,14 +14,14 @@ NULL
 register_cr_model(
   key = "RSF",
 
-  fit = function(data, time.var, event.var, args = list()) {
+  fit = function(data, time_var, event_var, args = list()) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
-    causes  <- cr_causes(data, event.var)
-    covars  <- setdiff(names(data), c(time.var, event.var))
+    causes  <- cr_causes(data, event_var)
+    covars  <- setdiff(names(data), c(time_var, event_var))
     formula <- stats::reformulate(covars,
-                 response = paste0("survival::Surv(", time.var, ", ", event.var, ")"))
+                 response = paste0("survival::Surv(", time_var, ", ", event_var, ")"))
 
     fits <- randomForestSRC::rfsrc(
       formula   = formula,
@@ -35,13 +35,13 @@ register_cr_model(
               class = c("cr_model_rsf", "cr_model"))
   },
 
-  predict_cif = function(fit_obj, newdata, times) {
+  predict_cif = function(fit_obj, newdata, time_grid) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
     n       <- nrow(newdata)
     K       <- length(fit_obj$causes)
-    out     <- array(0, dim = c(n, K, length(times)))
+    out     <- array(0, dim = c(n, K, length(time_grid)))
     pr      <- randomForestSRC::predict.rfsrc(fit_obj$fits, newdata = newdata)
     train_t <- pr$time.interest
 
@@ -51,7 +51,7 @@ register_cr_model(
         out[i, k, ] <- stats::approx(
           x    = train_t,
           y    = cif_mat[i, ],
-          xout = times,
+          xout = time_grid,
           rule = 2,
           ties = "ordered"
         )$y

@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
-  `fit(data, time.var, event.var, args)` / `predict_cif(fit_obj, newdata, times)` interface.
+  `fit(data, time_var, event_var, args)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
 - A **nested cross-validation** engine (`nested_cv_from_bench`) that reads the
   pre-built benchmark directory layout produced by the companion Python pipeline.
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
@@ -89,22 +89,22 @@ get_cr_model("FGR")$info()
 
 ### Registering a custom model
 
-Any model whose `fit` accepts `(data, time.var, event.var, args)` and whose
+Any model whose `fit` accepts `(data, time_var, event_var, args)` and whose
 `predict_cif` returns a `[n, K, Tm]` array can be registered.
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-  fit = function(data, time.var, event.var, args = list()) {
-    causes <- cr_causes(data, event.var)
+  fit = function(data, time_var, event_var, args = list()) {
+    causes <- cr_causes(data, event_var)
     # ... train model ...
     structure(list(causes = causes, fit = my_fit),
               class = c("cr_model_mymodel", "cr_model"))
   },
-  predict_cif = function(fit_obj, newdata, times) {
+  predict_cif = function(fit_obj, newdata, time_grid) {
     n  <- nrow(newdata)
     K  <- length(fit_obj$causes)
-    Tm <- length(times)
+    Tm <- length(time_grid)
     array(0.1, dim = c(n, K, Tm))
   },
   info = function() list(
@@ -124,7 +124,7 @@ Models are fitted by passing a data frame and the names of the time and event
 columns. No column naming convention is assumed.
 
 ```{r fit-predict}
-times <- seq(1, 10, by = 1)   # evaluation times: years 1-10
+time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
 
 set.seed(1)
 idx_tr <- sample(nrow(dat), floor(0.75 * nrow(dat)))
@@ -133,13 +133,13 @@ test   <- dat[-idx_tr, ]
 
 mdl <- get_cr_model("FGR")
 fit <- mdl$fit(data      = train,
-               time.var  = "time",
-               event.var = "event",
+               time_var  = "time",
+               event_var = "event",
                args      = list())
 
-# predict_cif() wrapper coerces newdata and times before dispatching
-cif <- predict_cif(fit, newdata = test, times = times)
-dim(cif)   # n_test x 2 causes x 10 times
+# predict_cif() wrapper coerces newdata and time_grid before dispatching
+cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
+dim(cif)   # n_test x 2 causes x 10 time points
 ```
 
 ---
@@ -152,7 +152,7 @@ causes <- sort(unique(dat$event[dat$event != 0]))   # 1, 2
 scores <- score_from_cifs(
   out     = cif,
   test    = test,
-  times   = times,
+  time_grid   = time_grid,
   causes  = causes,
   metrics = c("brier", "auc"),
   summary = "ibs"
@@ -168,7 +168,7 @@ scores$cause_bs$cause_2    # time-specific Brier score for death
 
 ```{r calibration, fig.alt="Calibration plot for cause 2 (death) at 5 years"}
 horizon   <- 5
-hi        <- which.min(abs(times - horizon))
+hi        <- which.min(abs(time_grid - horizon))
 pred_dead <- cif[, 2, hi]
 
 cal <- CalibrationPlot(
@@ -216,8 +216,8 @@ print(du$plot)
 ## 7  Nested cross-validation (benchmark workflow)
 
 `nested_cv_from_bench()` reads the pre-built directory layout produced by the
-companion Python pipeline. It passes `time.var = "time"` and
-`event.var = "event"` (the standardised names from `prepare_data()`) to every
+companion Python pipeline. It passes `time_var = "time"` and
+`event_var = "event"` (the standardised names from `prepare_data()`) to every
 `fit()` call internally.
 
 ```{r nested-cv, eval = FALSE}
@@ -276,10 +276,10 @@ cif_list <- lapply(seq_len(imp$m), function(k) {
   tr_k <- imp$imputations[[k]]$train
   te_k <- imp$imputations[[k]]$test
   fit_k <- mdl$fit(data      = tr_k,
-                   time.var  = "time",
-                   event.var = "event",
+                   time_var  = "time",
+                   event_var = "event",
                    args      = list())
-  mdl$predict_cif(fit_k, newdata = te_k, times = times)
+  mdl$predict_cif(fit_k, newdata = te_k, time_grid = time_grid)
 })
 
 cif_pooled <- pool_cifs_mean(cif_list)

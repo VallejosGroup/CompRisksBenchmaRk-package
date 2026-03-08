@@ -10,12 +10,12 @@ NULL
 #' from the named event column of a data frame, coercing to integer if needed.
 #'
 #' @param data A data frame containing the event column.
-#' @param event.var Character string naming the event column in `data`.
+#' @param event_var Character string naming the event column in `data`.
 #'
 #' @return A sorted integer vector of cause codes.
 #' @noRd
-cr_causes <- function(data, event.var) {
-  event <- data[[event.var]]
+cr_causes <- function(data, event_var) {
+  event <- data[[event_var]]
   if (!is.integer(event))
     event <- as.integer(as.character(event))
   sort(unique(event[event != 0]))
