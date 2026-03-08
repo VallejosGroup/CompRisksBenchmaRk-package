@@ -135,6 +135,7 @@ mdl <- get_cr_model("FGR")
 fit <- mdl$fit(data      = train,
                time_var  = "time",
                event_var = "event",
+               args      = list())
 
 # predict_cif() wrapper coerces newdata and time_grid before dispatching
 cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
