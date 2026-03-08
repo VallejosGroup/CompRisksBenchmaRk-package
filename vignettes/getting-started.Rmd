@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
-  `fit(data, formula, args)` / `predict_cif(fit_obj, newdata, times)` interface.
+  `fit(data, time.var, event.var, args)` / `predict_cif(fit_obj, newdata, times)` interface.
 - A **nested cross-validation** engine (`nested_cv_from_bench`) that reads the
   pre-built benchmark directory layout produced by the companion Python pipeline.
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
@@ -89,15 +89,14 @@ get_cr_model("FGR")$info()
 
 ### Registering a custom model
 
-Any model whose `fit` accepts `(data, formula, args)` and whose `predict_cif`
-returns a `[n, K, Tm]` array can be registered. The event variable is extracted
-from the formula response — no column name is assumed.
+Any model whose `fit` accepts `(data, time.var, event.var, args)` and whose
+`predict_cif` returns a `[n, K, Tm]` array can be registered.
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-  fit = function(data, formula, args = list()) {
-    causes <- cr_causes(data, formula)   # extracted from formula LHS
+  fit = function(data, time.var, event.var, args = list()) {
+    causes <- cr_causes(data, event.var)
     # ... train model ...
     structure(list(causes = causes, fit = my_fit),
               class = c("cr_model_mymodel", "cr_model"))
@@ -121,9 +120,8 @@ register_cr_model(
 
 ## 3  Fit and predict manually
 
-Models are fitted by passing a data frame and a formula. The formula response
-determines both the time and event variables — no column naming convention is
-assumed.
+Models are fitted by passing a data frame and the names of the time and event
+columns. No column naming convention is assumed.
 
 ```{r fit-predict}
 times <- seq(1, 10, by = 1)   # evaluation times: years 1-10
@@ -133,20 +131,15 @@ idx_tr <- sample(nrow(dat), floor(0.75 * nrow(dat)))
 train  <- dat[ idx_tr, ]
 test   <- dat[-idx_tr, ]
 
-# Formula: response encodes both time and event variable names
-cr_formula <- prodlim::Hist(time, event) ~ age + bili + albumin + protime + platelet
-
 mdl <- get_cr_model("FGR")
-fit <- mdl$fit(data = train, formula = cr_formula, args = list())
+fit <- mdl$fit(data      = train,
+               time.var  = "time",
+               event.var = "event",
+               args      = list())
 
 # predict_cif() wrapper coerces newdata and times before dispatching
-cif <- predict_cif("FGR", fit, newdata = test, times = times)
+cif <- predict_cif(fit, newdata = test, times = times)
 dim(cif)   # n_test x 2 causes x 10 times
-```
-
-```{r}
-plot(cif[1,1,])
-plot(cif[1,2,])
 ```
 
 ---
@@ -223,8 +216,9 @@ print(du$plot)
 ## 7  Nested cross-validation (benchmark workflow)
 
 `nested_cv_from_bench()` reads the pre-built directory layout produced by the
-companion Python pipeline. It builds the model formula internally from the
-manifest's feature list and passes it to `fit()`.
+companion Python pipeline. It passes `time.var = "time"` and
+`event.var = "event"` (the standardised names from `prepare_data()`) to every
+`fit()` call internally.
 
 ```{r nested-cv, eval = FALSE}
 results <- nested_cv_from_bench(
@@ -281,7 +275,10 @@ imp <- impute_split(
 cif_list <- lapply(seq_len(imp$m), function(k) {
   tr_k <- imp$imputations[[k]]$train
   te_k <- imp$imputations[[k]]$test
-  fit_k <- mdl$fit(data = tr_k, formula = cr_formula, args = list())
+  fit_k <- mdl$fit(data      = tr_k,
+                   time.var  = "time",
+                   event.var = "event",
+                   args      = list())
   mdl$predict_cif(fit_k, newdata = te_k, times = times)
 })
 

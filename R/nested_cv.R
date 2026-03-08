@@ -148,9 +148,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
   if (!is.null(drop_cols_after_impute))
     feature_cols <- setdiff(feature_cols, drop_cols_after_impute)
 
-  # Build model formula once — used by all fit() calls below
-  cr_formula <- stats::reformulate(feature_cols,
-                                   response = "prodlim::Hist(time, event)")
+  # Time and event variable names — standardised by prepare_data()
+  time.var  <- "time"
+  event.var <- "event"
 
   mdl      <- get_cr_model(model_key)
   meta     <- mdl$info()
@@ -194,7 +194,8 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         tr_m <- outer_data[[m]]$train
         te_m <- outer_data[[m]]$test
         fit  <- mdl$fit(data    = tr_m,
-                        formula = cr_formula,
+                        time.var  = time.var,
+                        event.var = event.var,
                         args    = list())
         cif_list[[m]] <- mdl$predict_cif(fit, newdata = te_m, times)
       }
@@ -240,9 +241,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           for (m in seq_len(m_inner)) {
             tr_m   <- jj[[m]]$train
             va_m   <- jj[[m]]$val
-            fit_in <- mdl$fit(data    = tr_m,
-                              formula = cr_formula,
-                              args    = cfg)
+            fit_in <- mdl$fit(data      = tr_m,
+                              time.var  = time.var,
+                              event.var = event.var,
+                              args      = cfg)
             cif_list[[m]] <- mdl$predict_cif(fit_in, newdata = va_m, times)
           }
 
@@ -294,9 +296,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         for (mii in seq_len(m_outer)) {
           tr_k  <- outer_data[[mii]]$train
           te_k  <- outer_data[[mii]]$test
-          fit_i <- mdl$fit(data    = tr_k,
-                           formula = cr_formula,
-                           args    = cfg_i)
+          fit_i <- mdl$fit(data      = tr_k,
+                           time.var  = time.var,
+                           event.var = event.var,
+                           args      = cfg_i)
           cif_list[[mii]] <- mdl$predict_cif(fit_i, newdata = te_k, times)
           if (frgp_details) {
             fit_list[[mii]]  <- fit_i

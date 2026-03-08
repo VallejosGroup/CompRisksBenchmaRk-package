@@ -15,30 +15,31 @@ NULL
 register_cr_model(
   key = "FGRP",
 
-  fit = function(data, formula, args = list()) {
+  fit = function(data, time.var, event.var, args = list()) {
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
 
-    causes <- cr_causes(data, formula)
-    x_cols <- setdiff(names(data), c("time", "event", "row_id"))
+    causes <- cr_causes(data, event.var)
+    x_cols <- setdiff(names(data), c(time.var, event.var, "row_id"))
 
-    lambda <- cr_arg(args, "lambda_seq", NULL)
+    lambda <- args$lambda_seq
     if (is.null(lambda))
       stop("FGRP: lambda_seq must be provided via the grid.")
 
     fits <- lapply(causes, function(k) {
       frm_k <- stats::as.formula(paste0(
-        "fastcmprsk::Crisk(time, event, cencode=0, failcode=", k, ") ~ ",
+        "fastcmprsk::Crisk(", time.var, ", ", event.var,
+        ", cencode=0, failcode=", k, ") ~ ",
         paste(x_cols, collapse = " + ")
       ))
       fp <- fastcmprsk::fastCrrp(
         formula     = frm_k,
         data        = data,
-        penalty     = cr_arg(args, "penalty",     "LASSO"),
+        penalty     = if (!is.null(args$penalty))     args$penalty     else "LASSO",
         nlambda     = 1L,
         lambda      = as.numeric(lambda),
-        standardize = cr_arg(args, "standardize", TRUE),
-        alpha       = cr_arg(args, "alpha",        0)
+        standardize = if (!is.null(args$standardize)) args$standardize else TRUE,
+        alpha       = if (!is.null(args$alpha))       args$alpha       else 0
       )
       if (!is.null(fp[["coef"]]) &&
           length(fp[["coef"]]) == length(x_cols)) {

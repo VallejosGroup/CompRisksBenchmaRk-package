@@ -13,14 +13,18 @@ NULL
 register_cr_model(
   key = "csCPH",
 
-  fit = function(data, formula, args = list()) {
+  fit = function(data, time.var, event.var, args = list()) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
       stop("Please install 'prodlim'.")
 
-    causes <- cr_causes(data, formula)
-    fits   <- lapply(causes, function(k) {
+    causes  <- cr_causes(data, event.var)
+    covars  <- setdiff(names(data), c(time.var, event.var))
+    formula <- stats::reformulate(covars,
+                 response = paste0("prodlim::Hist(", time.var, ", ", event.var, ")"))
+
+    fits <- lapply(causes, function(k) {
       riskRegression::CSC(formula = formula, data = data, cause = k)
     })
     structure(list(causes = causes, fits = fits),
