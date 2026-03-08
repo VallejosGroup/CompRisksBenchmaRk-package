@@ -19,10 +19,10 @@ register_cr_model(
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
     
-    inp    <- cr_prepare_inputs(x, y_time, y_event)
+    inp    <- cr_prepare_inputs(x, time = y_time, event = y_event)
     x_cols <- names(inp$x)
     
-    built  <- cr_build_formula(inp$x, inp$y_time, inp$y_event, "Hist")
+    built  <- cr_build_formula(inp$x, inp$time, inp$event, "Hist")
     covars <- setdiff(names(built$dat), c("time", "event"))
     
     lambda <- cr_arg(args, "lambda_seq", NULL)

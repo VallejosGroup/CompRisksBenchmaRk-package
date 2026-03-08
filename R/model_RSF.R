@@ -18,8 +18,8 @@ register_cr_model(
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
     
-    inp   <- cr_prepare_inputs(x, y_time, y_event)
-    built <- cr_build_formula(inp$x, inp$y_time, inp$y_event, "Surv")
+    inp   <- cr_prepare_inputs(x, time = y_time, event = y_event)
+    built <- cr_build_formula(inp$x, inp$time, inp$event, "Surv")
     
     fits <- randomForestSRC::rfsrc(
       formula   = built$formula,

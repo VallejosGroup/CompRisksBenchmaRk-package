@@ -6,45 +6,45 @@ NULL
 
 #' Coerce and validate model inputs
 #'
-#' Converts `x`, `y_time`, and `y_event` to the expected types and derives
+#' Validates `x`, `time`, and `event`, coercing where necessary, and derives
 #' the sorted vector of competing causes (all non-zero event codes).
 #'
 #' @param x Feature matrix or data frame.
-#' @param y_time Numeric vector of observed times.
-#' @param y_event Integer-coercible vector of event codes (0 = censored).
+#' @param time Numeric vector of observed times.
+#' @param event Integer-coercible vector of event codes (0 = censored).
 #'
-#' @return A named list with elements `x` (data.frame), `y_time` (numeric),
-#'   `y_event` (integer), and `causes` (sorted integer vector).
+#' @return A named list with elements `x` (data.frame), `time` (numeric),
+#'   `event` (integer), and `causes` (sorted integer vector).
 #' @noRd
-cr_prepare_inputs <- function(x, y_time, y_event) {
+cr_prepare_inputs <- function(x, time, event) {
   if (!is.data.frame(x))
     x <- as.data.frame(x)
-  if (!is.numeric(y_time))
-    stop("`y_time` must be a numeric vector.", call. = FALSE)
-  if (!is.integer(y_event))
-    y_event <- as.integer(as.character(y_event))
-  causes <- sort(unique(y_event[y_event != 0]))
-  list(x = x, y_time = y_time, y_event = y_event, causes = causes)
+  if (!is.numeric(time))
+    stop("`time` must be a numeric vector.", call. = FALSE)
+  if (!is.integer(event))
+    event <- as.integer(as.character(event))
+  causes <- sort(unique(event[event != 0]))
+  list(x = x, time = time, event = event, causes = causes)
 }
 
 
 #' Build a training data frame and model formula
 #'
-#' Assembles a data frame from `y_time`, `y_event`, and `x`, then builds a
+#' Assembles a data frame from `time`, `event`, and `x`, then builds a
 #' model formula with the requested response type.
 #'
 #' @param x A data frame of features (already coerced).
-#' @param y_time Numeric time vector.
-#' @param y_event Integer event vector.
+#' @param time Numeric time vector.
+#' @param event Integer event vector.
 #' @param response One of `"Hist"` (uses `prodlim::Hist(time, event)`,
 #'   default) or `"Surv"` (uses `survival::Surv(time, event)`).
 #'
 #' @return A named list with elements `dat` (data frame) and `formula`
 #'   (the assembled formula object).
 #' @noRd
-cr_build_formula <- function(x, y_time, y_event, response = c("Hist", "Surv")) {
+cr_build_formula <- function(x, time, event, response = c("Hist", "Surv")) {
   response <- match.arg(response)
-  dat    <- data.frame(time = y_time, event = y_event, x, check.names = FALSE)
+  dat    <- data.frame(time = time, event = event, x, check.names = FALSE)
   covars <- setdiff(names(dat), c("time", "event"))
   f      <- stats::reformulate(covars, response = NULL)
   lhs    <- switch(response,
