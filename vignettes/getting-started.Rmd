@@ -61,12 +61,14 @@ library(survival)
 data(pbc, package = "survival")
 pbc2        <- pbc[!is.na(pbc$trt), ]         # randomised patients only
 pbc2$time   <- pbc2$time / 365.25             # days -> years
+pbc2$stage  <- as.factor(pbc2$stage)          # ordinal disease stage (1-4)
 
-feature_cols <- c("age", "bili", "albumin", "protime", "platelet")
+feature_cols <- c("age", "stage", "bili", "albumin", "protime", "platelet")
 pbc2         <- pbc2[, c("time", "status", feature_cols)]
 pbc2         <- pbc2[complete.cases(pbc2), ]
 
 table(pbc2$status)
+table(pbc2$stage)
 ```
 
 `cr_data()` validates inputs, coerces the event column, records covariate
@@ -119,7 +121,9 @@ register_cr_model(
 
 ## 3  Fit and predict manually
 
-Models are fitted by passing a `cr_data` object.
+Models are fitted by passing a `cr_data` object.  We fit all four built-in
+models to the same train/test split; `predict_cif()` dispatches internally
+via `fit_obj$model_key` and returns an `[n, K, Tm]` array.
 
 ```{r fit-predict}
 time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
@@ -129,12 +133,42 @@ idx_tr   <- sample(nrow(cr@data), floor(0.75 * nrow(cr@data)))
 cr_train <- cr[idx_tr]
 cr_test  <- cr[-idx_tr]
 
-mdl <- get_cr_model("FGR")
-fit <- mdl$fit(cr = cr_train, args = list())
+# --- FGR ---
+fit_FGR  <- get_cr_model("FGR")$fit(cr = cr_train, args = list())
+cif_FGR  <- predict_cif(fit_FGR,  newdata = cr_test@data, time_grid = time_grid)
 
-# predict_cif() wrapper coerces newdata and time_grid before dispatching
-cif <- predict_cif(fit, newdata = cr_test@data, time_grid = time_grid)
-dim(cif)   # n_test x 2 causes x 10 time points
+# --- csCPH ---
+fit_csCPH <- get_cr_model("csCPH")$fit(cr = cr_train, args = list())
+cif_csCPH <- predict_cif(fit_csCPH, newdata = cr_test@data, time_grid = time_grid)
+
+# --- RSF ---
+fit_RSF  <- get_cr_model("RSF")$fit(cr = cr_train, args = list())
+cif_RSF  <- predict_cif(fit_RSF,  newdata = cr_test@data, time_grid = time_grid)
+
+# --- FGRP (requires a regularisation parameter) ---
+fit_FGRP <- get_cr_model("FGRP")$fit(cr = cr_train, args = list(lambda_seq = 0.01))
+cif_FGRP <- predict_cif(fit_FGRP, newdata = cr_test@data, time_grid = time_grid)
+
+# Collect for downstream use; all arrays: n_test x 2 causes x 10 time points
+model_keys <- c("FGR", "csCPH", "RSF", "FGRP")
+fits <- list(FGR = fit_FGR, csCPH = fit_csCPH, RSF = fit_RSF, FGRP = fit_FGRP)
+cifs <- list(FGR = cif_FGR, csCPH = cif_csCPH, RSF = cif_RSF, FGRP = cif_FGRP)
+
+sapply(cifs, dim)
+```
+
+The explicit calls above make it straightforward to inspect or debug any
+individual model.  For convenience, the same result can be obtained
+programmatically:
+
+```{r fit-predict-lapply, eval = FALSE}
+fits <- lapply(setNames(model_keys, model_keys), function(key) {
+  args <- if (key == "FGRP") list(lambda_seq = 0.01) else list()
+  get_cr_model(key)$fit(cr = cr_train, args = args)
+})
+cifs <- lapply(fits, function(fit)
+  predict_cif(fit, newdata = cr_test@data, time_grid = time_grid)
+)
 ```
 
 ---
@@ -142,46 +176,53 @@ dim(cif)   # n_test x 2 causes x 10 time points
 ## 4  Scoring
 
 ```{r scoring}
-causes <- sort(unique(dat$event[dat$event != 0]))   # 1, 2
-
-scores <- score_from_cifs(
-  out     = cif,
-  test    = test,
-  times   = time_grid,
-  causes  = causes,
-  metrics = c("brier", "auc"),
-  summary = "ibs"
+# Score each model; results is a named list of score objects
+scores <- lapply(cifs, function(cif)
+  score_from_cifs(
+    out     = cif,
+    test    = cr_test@data,
+    times   = time_grid,
+    causes  = cr_test@causes,
+    metrics = c("brier", "auc"),
+    summary = "ibs"
+  )
 )
 
-scores$cause_ibs           # IBS per cause
-scores$cause_bs$cause_2    # time-specific Brier score for death
+scores$FGR$cause_ibs           # IBS per cause for FGR
+scores$FGR$cause_bs$cause_2    # time-specific Brier score for death (FGR)
+
+# Compare IBS for cause 2 across models
+sapply(scores, function(s) s$cause_ibs$cause_2)
 ```
 
 ---
 
 ## 5  Calibration
 
-```{r calibration, fig.alt="Calibration plot for cause 2 (death) at 5 years"}
-horizon   <- 5
-hi        <- which.min(abs(time_grid - horizon))
-pred_dead <- cif[, 2, hi]
+```{r calibration, fig.alt="Calibration plots for cause 2 (death) at 5 years"}
+horizon <- 5
+hi      <- which.min(abs(time_grid - horizon))
 
-cal <- CalibrationPlot(
-  model_name       = "FGR",
-  predictions      = pred_dead,
-  data             = test,
-  time             = test$time,
-  status           = test$event,
-  tau              = horizon,
-  cause            = 2,
-  predictions.type = "CIF",
-  loess_smoothing  = TRUE,
-  graph            = TRUE
-)
+# Calibration plot for each model at the 5-year horizon for cause 2 (death)
+cal_list <- lapply(model_keys, function(key) {
+  CalibrationPlot(
+    model_name       = key,
+    predictions      = cifs[[key]][, 2, hi],
+    data             = cr_test@data,
+    time             = cr_test@data[[cr_test@time_var]],
+    status           = cr_test@data[[cr_test@event_var]],
+    tau              = horizon,
+    cause            = 2,
+    predictions.type = "CIF",
+    loess_smoothing  = TRUE,
+    graph            = TRUE
+  )
+})
+names(cal_list) <- model_keys
 
-print(cal$graphs[[1]])
-cal$calib.measures[[1]]    # ICI, E50, E90, Emax, RSB
-cal$OE_summary             # O/E ratio with 95% CI
+lapply(cal_list, function(cal) print(cal$graphs[[1]]))
+cal_list$FGR$calib.measures[[1]]    # ICI, E50, E90, Emax, RSB for FGR
+cal_list$FGR$OE_summary             # O/E ratio with 95% CI for FGR
 ```
 
 ---
@@ -189,15 +230,19 @@ cal$OE_summary             # O/E ratio with 95% CI
 ## 6  Decision curve analysis
 
 ```{r dca, fig.alt="Decision curve analysis for 5-year death risk"}
-test_dca          <- test
-test_dca$pred_FGR <- pred_dead
+# Add each model's 5-year cause-2 predictions as columns for DCA
+test_dca <- cr_test@data
+for (key in model_keys)
+  test_dca[[paste0("pred_", key)]] <- cifs[[key]][, 2, hi]
+
+pred_cols <- paste0("pred_", model_keys)
 
 du <- ClinicalUtility(
   data         = test_dca,
-  outcome      = "event",
-  ttoutcome    = "time",
+  outcome      = cr_test@event_var,
+  ttoutcome    = cr_test@time_var,
   timepoint    = horizon,
-  predictors   = "pred_FGR",
+  predictors   = pred_cols,
   graph        = TRUE,
   intervention = FALSE,
   cmprsk       = TRUE
@@ -260,18 +305,23 @@ prevent data leakage. For MICE (`m > 1`), predictions are pooled across
 imputed datasets with `pool_cifs_mean()`.
 
 ```{r imputation, eval = FALSE}
+feature_cols <- cr_train@covars$covars_names
+
 imp <- impute_split(
-  train        = train,
-  test         = test,
+  train        = cr_train@data,
+  test         = cr_test@data,
   feature_cols = feature_cols,
   method       = "median_mode"    # or "mice" for multiple imputation
 )
 
+mdl <- get_cr_model("FGR")
+
 cif_list <- lapply(seq_len(imp$m), function(k) {
   tr_k <- imp$imputations[[k]]$train
   te_k <- imp$imputations[[k]]$test
-  cr_k  <- cr_data(tr_k, time_var = "time", event_var = "event")
-  fit_k <- mdl$fit(cr = cr_k,
+  cr_k <- cr_data(tr_k, time_var = cr_train@time_var,
+                  event_var = cr_train@event_var)
+  fit_k <- mdl$fit(cr = cr_k, args = list())
   mdl$predict_cif(fit_k, newdata = te_k, time_grid = time_grid)
 })
 
