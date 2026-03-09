@@ -15,7 +15,10 @@ NULL
 register_cr_model(
   key = "FGRP",
 
-  fit = function(cr, args = list(), ...) {
+  fit = function(obj, args = list(), ...) {
+    if (!methods::is(obj, "cr_data"))
+      stop("`obj` must be a cr_data object.", call. = FALSE)
+
     if (!requireNamespace("fastcmprsk", quietly = TRUE))
       stop("Please install 'fastcmprsk'.")
 
@@ -23,17 +26,17 @@ register_cr_model(
     if (is.null(lambda))
       stop("FGRP: lambda_seq must be provided via the grid.")
 
-    x_cols <- cr@covars$covars_names
+    x_cols <- obj@covars$covars_names
 
-    fits <- lapply(cr@causes, function(k) {
+    fits <- lapply(obj@causes, function(k) {
       frm_k <- stats::as.formula(paste0(
-        "fastcmprsk::Crisk(", cr@time_var, ", ", cr@event_var,
+        "fastcmprsk::Crisk(", obj@time_var, ", ", obj@event_var,
         ", cencode=0, failcode=", k, ") ~ ",
         paste(x_cols, collapse = " + ")
       ))
       fp <- fastcmprsk::fastCrrp(
         formula     = frm_k,
-        data        = cr@data,
+        data        = obj@data,
         penalty     = if (!is.null(args$penalty))     args$penalty     else "LASSO",
         nlambda     = 1,
         lambda      = as.numeric(lambda),
@@ -50,7 +53,7 @@ register_cr_model(
       list(fp = fp)
     })
 
-    list(causes = cr@causes, fits = fits, x_cols = x_cols,
+    list(causes = obj@causes, fits = fits, x_cols = x_cols,
          model_key = "FGRP")
   },
 

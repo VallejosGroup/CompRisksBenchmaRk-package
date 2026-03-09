@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
-  `fit(cr, args, ...)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
+  `fit(obj, args, ...)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
 - A **nested cross-validation** engine (`nested_cv_from_bench`) that reads the
   pre-built benchmark directory layout produced by the companion Python pipeline.
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
@@ -100,9 +100,9 @@ Any model whose `fit` accepts a `cr_data` object and whose
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-  fit = function(cr, args = list(), ...) {
-    # ... train model using cr@data, cr@time_var, cr@event_var, cr@causes ...
-    list(causes = cr@causes, fit = my_fit, model_key = "MyModel")
+  fit = function(obj, args = list(), ...) {
+    # ... train model using obj@data, obj@time_var, obj@event_var, obj@causes ...
+    list(causes = obj@causes, fit = my_fit, model_key = "MyModel")
   },
   predict_cif = function(fit_obj, newdata, time_grid) {
     n  <- nrow(newdata)
@@ -161,7 +161,7 @@ programmatically:
 ```{r fit-predict-lapply, eval = FALSE}
 fits <- lapply(setNames(model_keys, model_keys), function(key) {
   args <- if (key == "FGRP") list(lambda_seq = 0.01) else list()
-  fit_cr_model(key, cr, args = args)
+  fit_cr_model(key, obj = cr, args = args)
 })
 cifs <- lapply(fits, function(fit)
   predict_cif(fit, newdata = cr@data, time_grid = time_grid)

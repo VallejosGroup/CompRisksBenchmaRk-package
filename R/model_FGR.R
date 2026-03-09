@@ -18,21 +18,24 @@ NULL
 register_cr_model(
   key = "FGR",
 
-  fit = function(cr, args = list(), ...) {
+  fit = function(obj, args = list(), ...) {
+    if (!methods::is(obj, "cr_data"))
+      stop("`obj` must be a cr_data object.", call. = FALSE)
+
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
       stop("Please install 'prodlim'.")
 
     formula <- stats::reformulate(
-      cr@covars$covars_names,
-      response = paste0("prodlim::Hist(", cr@time_var, ", ", cr@event_var, ")")
+      obj@covars$covars_names,
+      response = paste0("prodlim::Hist(", obj@time_var, ", ", obj@event_var, ")")
     )
 
-    fits <- lapply(cr@causes, function(k) {
-      riskRegression::FGR(formula, data = cr@data, cause = k, ...)
+    fits <- lapply(obj@causes, function(k) {
+      riskRegression::FGR(formula, data = obj@data, cause = k, ...)
     })
-    list(causes = cr@causes, fits = fits, model_key = "FGR")
+    list(causes = obj@causes, fits = fits, model_key = "FGR")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {

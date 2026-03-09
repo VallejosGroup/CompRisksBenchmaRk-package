@@ -4,13 +4,13 @@
 \alias{fit_cr_model}
 \title{Fit a registered competing risks model}
 \usage{
-fit_cr_model(model_key, cr, args = list(), ...)
+fit_cr_model(model_key, obj, args = list(), ...)
 }
 \arguments{
 \item{model_key}{A single non-empty character string identifying a
 registered model (see [list_cr_models()]).}
 
-\item{cr}{A \code{cr_data} object produced by [cr_data()].}
+\item{obj}{A \code{cr_data} object produced by [cr_data()].}
 
 \item{args}{A named list of hyperparameter arguments passed to the model's
 \code{fit} function.}
@@ -29,6 +29,6 @@ key and calls its \code{fit} function directly, without needing to call
 }
 \examples{
 \dontrun{
-fit <- fit_cr_model("FGR", cr)
+fit <- fit_cr_model("FGR", obj)
 }
 }

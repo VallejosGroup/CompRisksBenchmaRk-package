@@ -7,7 +7,7 @@
 A lightweight registry that maps string keys to model objects.  Each
 registered model must expose three functions:
 \describe{
-  \item{fit}{\code{fit(cr, args, \dots)} — trains the model on a \code{cr_data}
+  \item{fit}{\code{fit(obj, args, \dots)} — trains the model on a \code{cr_data}
     object (see \code{cr_data()}). Grid parameters are passed via \code{args};
     any additional arguments for the underlying fitting function via \code{\dots}.}
   \item{predict_cif}{\code{predict_cif(fit_obj, newdata, time_grid)} — returns a

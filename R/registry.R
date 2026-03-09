@@ -4,7 +4,7 @@
 #' A lightweight registry that maps string keys to model objects.  Each
 #' registered model must expose three functions:
 #' \describe{
-#'   \item{fit}{\code{fit(cr, args, \dots)} — trains the model on a \code{cr_data}
+#'   \item{fit}{\code{fit(obj, args, \dots)} — trains the model on a \code{cr_data}
 #'     object (see \code{cr_data()}). Grid parameters are passed via \code{args};
 #'     any additional arguments for the underlying fitting function via \code{\dots}.}
 #'   \item{predict_cif}{\code{predict_cif(fit_obj, newdata, time_grid)} — returns a
@@ -23,7 +23,7 @@ NULL
 #' by key and used inside [nested_cv_from_bench()].
 #'
 #' @param key A single non-empty character string used to identify the model.
-#' @param fit A function with signature \code{fit(cr, args, \dots)} where \code{cr}
+#' @param fit A function with signature \code{fit(obj, args, \dots)} where \code{obj}
 #'   is a \code{cr_data} object, \code{args} is a named list of grid-tuned
 #'   arguments, and \code{\dots} accepts further arguments for the underlying
 #'   fitting function.
@@ -118,7 +118,7 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
 #'
 #' @param model_key A single non-empty character string identifying a
 #'   registered model (see [list_cr_models()]).
-#' @param cr A \code{cr_data} object produced by [cr_data()].
+#' @param obj A \code{cr_data} object produced by [cr_data()].
 #' @param args A named list of hyperparameter arguments passed to the model's
 #'   \code{fit} function.
 #' @param ... Additional arguments forwarded to the underlying fitting
@@ -130,10 +130,10 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
 #'
 #' @examples
 #' \dontrun{
-#' fit <- fit_cr_model("FGR", cr)
+#' fit <- fit_cr_model("FGR", obj)
 #' }
-fit_cr_model <- function(model_key, cr, args = list(), ...) {
-  get_cr_model(model_key)$fit(cr = cr, args = args, ...)
+fit_cr_model <- function(model_key, obj, args = list(), ...) {
+  get_cr_model(model_key)$fit(obj = obj, args = args, ...)
 }
 
 

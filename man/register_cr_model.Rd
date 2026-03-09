@@ -9,7 +9,7 @@ register_cr_model(key, fit, predict_cif, info)
 \arguments{
 \item{key}{A single non-empty character string used to identify the model.}
 
-\item{fit}{A function with signature \code{fit(cr, args, \dots)} where \code{cr}
+\item{fit}{A function with signature \code{fit(obj, args, \dots)} where \code{obj}
 is a \code{cr_data} object, \code{args} is a named list of grid-tuned
 arguments, and \code{\dots} accepts further arguments for the underlying
 fitting function.}
