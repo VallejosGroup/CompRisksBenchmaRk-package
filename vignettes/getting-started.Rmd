@@ -65,7 +65,7 @@ pbc2$stage  <- as.factor(                     # group stages 1-2 vs 3 vs 4
   ifelse(pbc2$stage %in% c(1, 2), "1-2", as.character(pbc2$stage))
 )
 
-feature_cols <- c("age", "stage", "bili", "albumin", "protime", "platelet")
+feature_cols <- c("age", "stage", "bili", "albumin", "protime")
 pbc2         <- pbc2[, c("time", "status", feature_cols)]
 pbc2         <- pbc2[complete.cases(pbc2), ]
 
