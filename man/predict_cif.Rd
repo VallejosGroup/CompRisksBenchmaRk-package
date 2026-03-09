@@ -23,8 +23,8 @@ The registered model is looked up from `fit_obj$model_key`.
 }
 \examples{
 \dontrun{
-fit <- get_cr_model("FGR")$fit(cr_data(train, time_var = "time",
-                              event_var = "event"), args = list())
+fit <- fit_cr_model("FGR", cr_data(train, time_var = "time",
+                                   event_var = "event"))
 cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
 }
 }

@@ -98,8 +98,8 @@ get_cr_model <- function(key) {
 #'
 #' @examples
 #' \dontrun{
-#' fit <- get_cr_model("FGR")$fit(cr_data(train, time_var = "time",
-#'                               event_var = "event"), args = list())
+#' fit <- fit_cr_model("FGR", cr_data(train, time_var = "time",
+#'                                    event_var = "event"))
 #' cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {
@@ -107,6 +107,33 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
   newdata <- if (is.data.frame(newdata)) newdata else as.data.frame(newdata)
   time_grid   <- as.numeric(time_grid)
   mdl$predict_cif(fit_obj, newdata, time_grid)
+}
+
+
+#' Fit a registered competing risks model
+#'
+#' A convenience wrapper around [get_cr_model()] that retrieves the model by
+#' key and calls its \code{fit} function directly, without needing to call
+#' \code{get_cr_model(key)$fit(...)}.
+#'
+#' @param model_key A single non-empty character string identifying a
+#'   registered model (see [list_cr_models()]).
+#' @param cr A \code{cr_data} object produced by [cr_data()].
+#' @param args A named list of hyperparameter arguments passed to the model's
+#'   \code{fit} function.
+#' @param ... Additional arguments forwarded to the underlying fitting
+#'   function.
+#'
+#' @return A fitted model object (a named list containing at least
+#'   \code{model_key} and \code{causes}).
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' fit <- fit_cr_model("FGR", cr)
+#' }
+fit_cr_model <- function(model_key, cr, args = list(), ...) {
+  get_cr_model(model_key)$fit(cr = cr, args = args, ...)
 }
 
 
