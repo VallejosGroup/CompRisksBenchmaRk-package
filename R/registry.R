@@ -4,13 +4,14 @@
 #' A lightweight registry that maps string keys to model objects.  Each
 #' registered model must expose three functions:
 #' \describe{
-#'   \item{fit}{`fit(cr, args, ...)` — trains the model on a \code{cr_data}
-#'     object (see \code{cr_data()}). Grid parameters are passed via `args`; any
-#'     additional arguments for the underlying fitting function via `...`.}
+#'   \item{fit}{\code{fit(cr, args, \dots)} — trains the model on a \code{cr_data}
+#'     object (see \code{cr_data()}). Grid parameters are passed via \code{args};
+#'     any additional arguments for the underlying fitting function via \code{\dots}.}
+#'   \item{predict_cif}{\code{predict_cif(fit_obj, newdata, time_grid)} — returns a
 #'     3-D array of cumulative incidence function (CIF) predictions with
-#'     dimensions `[n, K, |time_grid|]`.}
-#'   \item{info}{`info()` — returns a named list with at least `name`,
-#'     `supports`, `needs_tuning`, and `default_grid`.}
+#'     dimensions \code{[n, K, |time_grid|]}.}
+#'   \item{info}{\code{info()} — returns a named list with at least \code{name},
+#'     \code{supports}, \code{needs_tuning}, and \code{default_grid}.}
 #' }
 #'
 #' @name registry
@@ -22,14 +23,15 @@ NULL
 #' by key and used inside [nested_cv_from_bench()].
 #'
 #' @param key A single non-empty character string used to identify the model.
-#'   \item{fit}{`fit(cr, args, ...)` — trains the model on a \code{cr_data}
-#'     object (see \code{cr_data()}). Grid parameters are passed via `args`; any
-#'     additional arguments for the underlying fitting function via `...`.}
+#' @param fit A function with signature \code{fit(cr, args, \dots)} where \code{cr}
+#'   is a \code{cr_data} object, \code{args} is a named list of grid-tuned
+#'   arguments, and \code{\dots} accepts further arguments for the underlying
+#'   fitting function.
 #' @param predict_cif A function with signature
-#'   `predict_cif(fit_obj, newdata, time_grid)` that returns a 3-D numeric array
-#'   of dimensions `[n, K, Tm]`.
+#'   \code{predict_cif(fit_obj, newdata, time_grid)} that returns a 3-D numeric
+#'   array of dimensions \code{[n, K, Tm]}.
 #' @param info A zero-argument function returning a named list with fields
-#'   `name`, `supports`, `needs_tuning`, and `default_grid`.
+#'   \code{name}, \code{supports}, \code{needs_tuning}, and \code{default_grid}.
 #'
 #' @return Invisibly `TRUE`.
 #' @export
@@ -51,13 +53,13 @@ NULL
 register_cr_model <- function(key, fit, predict_cif, info) {
   stopifnot(is.character(key), length(key) == 1, nzchar(key))
   stopifnot(is.function(fit), is.function(predict_cif), is.function(info))
-
+  
   if (exists(key, envir = .cr_models, inherits = FALSE))
     warning("Overwriting registered model: ", key, call. = FALSE)
-
+  
   assign(key, list(fit = fit, predict_cif = predict_cif, info = info),
          envir = .cr_models)
-
+  
   invisible(TRUE)
 }
 
@@ -117,4 +119,3 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
 #' @examples
 #' list_cr_models()
 list_cr_models <- function() ls(envir = .cr_models)
-

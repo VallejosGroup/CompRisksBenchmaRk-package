@@ -24,8 +24,8 @@ model's `fit` function stores in the returned object via `structure()`.
 }
 \examples{
 \dontrun{
-fit <- get_cr_model("FGR")$fit(train, time_var = "time",
-                               event_var = "event", args = list())
+fit <- get_cr_model("FGR")$fit(cr_data(train, time_var = "time",
+                              event_var = "event"), args = list())
 cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
 }
 }

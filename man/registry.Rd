@@ -7,14 +7,13 @@
 A lightweight registry that maps string keys to model objects.  Each
 registered model must expose three functions:
 \describe{
-  \item{fit}{`fit(data, time_var, event_var, args, ...)` — trains the model on a
-    data frame, using `time_var` and `event_var` to identify the time and
-    event columns. Grid parameters are passed via `args`; any additional
-    arguments for the underlying fitting function can be passed via `...`.}
-  \item{predict_cif}{`predict_cif(fit_obj, newdata, time_grid)` — returns a
+  \item{fit}{\code{fit(cr, args, \dots)} — trains the model on a \code{cr_data}
+    object (see \code{cr_data()}). Grid parameters are passed via \code{args};
+    any additional arguments for the underlying fitting function via \code{\dots}.}
+  \item{predict_cif}{\code{predict_cif(fit_obj, newdata, time_grid)} — returns a
     3-D array of cumulative incidence function (CIF) predictions with
-    dimensions `[n, K, |time_grid|]`.}
-  \item{info}{`info()` — returns a named list with at least `name`,
-    `supports`, `needs_tuning`, and `default_grid`.}
+    dimensions \code{[n, K, |time_grid|]}.}
+  \item{info}{\code{info()} — returns a named list with at least \code{name},
+    \code{supports}, \code{needs_tuning}, and \code{default_grid}.}
 }
 }
