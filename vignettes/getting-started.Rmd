@@ -132,19 +132,19 @@ time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
 
 # --- FGR ---
 fit_FGR  <- fit_cr_model("FGR", cr)
-cif_FGR  <- predict_cif(fit_FGR,  newdata = cr@data, time_grid = time_grid)
+cif_FGR  <- predict_cif(fit_FGR,  newdata = cr, time_grid = time_grid)
 
 # --- csCPH ---
 fit_csCPH <- fit_cr_model("csCPH", cr)
-cif_csCPH <- predict_cif(fit_csCPH, newdata = cr@data, time_grid = time_grid)
+cif_csCPH <- predict_cif(fit_csCPH, newdata = cr, time_grid = time_grid)
 
 # --- RSF ---
 fit_RSF  <- fit_cr_model("RSF", cr)
-cif_RSF  <- predict_cif(fit_RSF,  newdata = cr@data, time_grid = time_grid)
+cif_RSF  <- predict_cif(fit_RSF,  newdata = cr, time_grid = time_grid)
 
 # --- FGRP (requires a regularisation parameter) ---
 fit_FGRP <- fit_cr_model("FGRP", cr, args = list(lambda_seq = 0.01))
-cif_FGRP <- predict_cif(fit_FGRP, newdata = cr@data, time_grid = time_grid)
+cif_FGRP <- predict_cif(fit_FGRP, newdata = cr, time_grid = time_grid)
 
 # Collect for downstream use; all arrays: n x 2 causes x 10 time points
 model_keys <- c("FGR", "csCPH", "RSF", "FGRP")
@@ -164,7 +164,7 @@ fits <- lapply(setNames(model_keys, model_keys), function(key) {
   fit_cr_model(key, obj = cr, args = args)
 })
 cifs <- lapply(fits, function(fit)
-  predict_cif(fit, newdata = cr@data, time_grid = time_grid)
+  predict_cif(fit, newdata = cr, time_grid = time_grid)
 )
 ```
 

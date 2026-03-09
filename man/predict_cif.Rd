@@ -7,24 +7,25 @@
 predict_cif(fit_obj, newdata, time_grid)
 }
 \arguments{
-\item{fit_obj}{A fitted model object returned by the model's `fit` function.}
+\item{fit_obj}{A fitted model object returned by [fit_cr_model()].}
 
-\item{newdata}{Data frame of new observations.}
+\item{newdata}{A [cr_data()] object or a plain data frame of new
+observations.}
 
-\item{time_grid}{Numeric vector of evaluation time_grid.}
+\item{time_grid}{Numeric vector of evaluation times.}
 }
 \value{
 A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
 }
 \description{
-A thin wrapper around a model's `predict_cif` function that coerces
-`newdata` to a data frame and `time_grid` to numeric before dispatching.
+A thin wrapper around a model's `predict_cif` function that extracts the
+data frame from a [cr_data()] object (or accepts a plain data frame) and
+coerces `time_grid` to numeric before dispatching.
 The registered model is looked up from `fit_obj$model_key`.
 }
 \examples{
 \dontrun{
-fit <- fit_cr_model("FGR", cr_data(train, time_var = "time",
-                                   event_var = "event"))
-cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
+fit <- fit_cr_model("FGR", cr)
+cif <- predict_cif(fit, newdata = cr, time_grid = time_grid)
 }
 }

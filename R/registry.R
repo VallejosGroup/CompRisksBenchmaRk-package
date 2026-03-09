@@ -85,27 +85,30 @@ get_cr_model <- function(key) {
 
 #' Predict cumulative incidence functions for a registered model
 #'
-#' A thin wrapper around a model's `predict_cif` function that coerces
-#' `newdata` to a data frame and `time_grid` to numeric before dispatching.
+#' A thin wrapper around a model's `predict_cif` function that extracts the
+#' data frame from a [cr_data()] object (or accepts a plain data frame) and
+#' coerces `time_grid` to numeric before dispatching.
 #' The registered model is looked up from `fit_obj$model_key`.
 #'
-#' @param fit_obj A fitted model object returned by the model's `fit` function.
-#' @param newdata Data frame of new observations.
-#' @param time_grid Numeric vector of evaluation time_grid.
+#' @param fit_obj A fitted model object returned by [fit_cr_model()].
+#' @param newdata A [cr_data()] object or a plain data frame of new
+#'   observations.
+#' @param time_grid Numeric vector of evaluation times.
 #'
 #' @return A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' fit <- fit_cr_model("FGR", cr_data(train, time_var = "time",
-#'                                    event_var = "event"))
-#' cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
+#' fit <- fit_cr_model("FGR", cr)
+#' cif <- predict_cif(fit, newdata = cr, time_grid = time_grid)
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {
-  mdl     <- get_cr_model(fit_obj$model_key)
-  newdata <- if (is.data.frame(newdata)) newdata else as.data.frame(newdata)
-  time_grid   <- as.numeric(time_grid)
+  mdl       <- get_cr_model(fit_obj$model_key)
+  newdata   <- if (methods::is(newdata, "cr_data")) newdata@data
+               else if (is.data.frame(newdata)) newdata
+               else as.data.frame(newdata)
+  time_grid <- as.numeric(time_grid)
   mdl$predict_cif(fit_obj, newdata, time_grid)
 }
 
