@@ -98,8 +98,7 @@ register_cr_model(
   key = "MyModel",
   fit = function(cr, args = list(), ...) {
     # ... train model using cr@data, cr@time_var, cr@event_var, cr@causes ...
-    structure(list(causes = cr@causes, fit = my_fit, model_key = "MyModel"),
-              class = c("cr_model_mymodel", "cr_model"))
+    list(causes = cr@causes, fit = my_fit, model_key = "MyModel")
   },
   predict_cif = function(fit_obj, newdata, time_grid) {
     n  <- nrow(newdata)

@@ -50,9 +50,8 @@ register_cr_model(
       list(fp = fp)
     })
 
-    structure(list(causes = cr@causes, fits = fits, x_cols = x_cols,
-                   model_key = "FGRP"),
-              class = c("cr_model_fgrp", "cr_model"))
+    list(causes = cr@causes, fits = fits, x_cols = x_cols,
+         model_key = "FGRP")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {

@@ -62,23 +62,23 @@ cr_data <- function(data, time_var, event_var,
                     sort_by_time = TRUE,
                     id_var       = NULL,
                     time_offset  = 0) {
-
+  
   # --- Input validation ---
   if (!is.data.frame(data))
     stop("`data` must be a data frame.", call. = FALSE)
   if (nrow(data) == 0)
     stop("`data` has no rows.", call. = FALSE)
-
+  
   if (!is.character(time_var) || length(time_var) != 1 || !nzchar(time_var))
     stop("`time_var` must be a single non-empty string.", call. = FALSE)
   if (!is.character(event_var) || length(event_var) != 1 || !nzchar(event_var))
     stop("`event_var` must be a single non-empty string.", call. = FALSE)
-
+  
   if (!time_var %in% names(data))
     stop(sprintf("`time_var` '%s' not found in `data`.", time_var), call. = FALSE)
   if (!event_var %in% names(data))
     stop(sprintf("`event_var` '%s' not found in `data`.", event_var), call. = FALSE)
-
+  
   if (!is.null(id_var)) {
     if (!is.character(id_var) || length(id_var) != 1 || !nzchar(id_var))
       stop("`id_var` must be a single non-empty string.", call. = FALSE)
@@ -87,22 +87,22 @@ cr_data <- function(data, time_var, event_var,
     if (any(is.na(data[[id_var]])))
       stop(sprintf("`id_var` '%s' contains NA values.", id_var), call. = FALSE)
   }
-
+  
   if (!is.numeric(data[[time_var]]))
     stop(sprintf("`time_var` '%s' must be numeric.", time_var), call. = FALSE)
   if (any(is.na(data[[time_var]])))
     stop(sprintf("`time_var` '%s' contains NA values.", time_var), call. = FALSE)
-
+  
   event <- data[[event_var]]
   if (!is.numeric(event) && !is.integer(event) && !is.factor(event))
     stop(sprintf("`event_var` '%s' must be numeric, integer, or factor.", event_var),
          call. = FALSE)
   if (any(is.na(event)))
     stop(sprintf("`event_var` '%s' contains NA values.", event_var), call. = FALSE)
-
+  
   if (!is.numeric(time_offset) || length(time_offset) != 1 || time_offset < 0)
     stop("`time_offset` must be a single non-negative number.", call. = FALSE)
-
+  
   # --- Zero-time guard ---
   min_time <- suppressWarnings(min(data[[time_var]], na.rm = TRUE))
   if (is.finite(min_time) && min_time == 0) {
@@ -114,10 +114,10 @@ cr_data <- function(data, time_var, event_var,
       )
     data[[time_var]] <- data[[time_var]] + time_offset
   }
-
+  
   # --- Type coercion ---
   data[[event_var]] <- as.integer(as.character(data[[event_var]]))
-
+  
   feature_cols <- setdiff(names(data), c(time_var, event_var, id_var))
   covars_types <- vector("character", length(feature_cols))
   for (i in seq_along(feature_cols)) {
@@ -135,26 +135,26 @@ cr_data <- function(data, time_var, event_var,
       data[[feature_cols[[i]]]] <- as.numeric(x)
     }
   }
-
+  
   # --- Optional sort by time ---
   if (sort_by_time)
     data <- data[order(data[[time_var]]), , drop = FALSE]
-
+  
   # --- Cause and covariate extraction ---
   causes <- cr_causes(data, event_var)
   covars <- data.frame(covars_names = feature_cols,
                        covars_types = covars_types,
                        stringsAsFactors = FALSE)
-
+  
   methods::new("cr_data",
-    data         = data,
-    causes       = causes,
-    covars       = covars,
-    time_var     = time_var,
-    event_var    = event_var,
-    id_var       = if (!is.null(id_var)) id_var else "",
-    sort_by_time = sort_by_time,
-    time_offset  = time_offset
+               data         = data,
+               causes       = causes,
+               covars       = covars,
+               time_var     = time_var,
+               event_var    = event_var,
+               id_var       = if (!is.null(id_var)) id_var else "",
+               sort_by_time = sort_by_time,
+               time_offset  = time_offset
   )
 }
 
@@ -204,31 +204,52 @@ methods::setMethod("show", "cr_data", function(object) {
 })
 
 
-#' Subset rows of a cr_data object
+#' Subset a cr_data object
 #'
-#' Extracts a row subset of the underlying data frame while preserving all
-#' metadata slots.  Causes are re-derived from the subset so that causes
-#' absent in the subset are dropped.
+#' Subsets rows and/or columns of the underlying data frame while preserving
+#' all metadata slots.  Causes are re-derived from the row subset so that
+#' causes absent in the subset are dropped.  Dropping \code{time_var} or
+#' \code{event_var} raises an error; \code{id_var} (if set) is always
+#' retained regardless of \code{j}.
 #'
-#' @param x   A \code{cr_data} object.
-#' @param i   Row index (integer, logical, or character vector).
-#' @param j   Ignored; present for S4 compatibility.
+#' @param x    A \code{cr_data} object.
+#' @param i    Row index (integer, logical, or character vector).  If missing,
+#'   all rows are kept.
+#' @param j    Column names to keep (character vector).  If missing, all
+#'   columns are kept.
 #' @param drop Ignored.
 #'
-#' @return A new \code{cr_data} object containing only the selected rows.
+#' @return A new \code{cr_data} object.
 #' @exportMethod [
-methods::setMethod("[", signature("cr_data", "ANY", "missing", "missing"),
-  function(x, i, j, drop) {
-    new_data <- x@data[i, , drop = FALSE]
-    methods::new("cr_data",
-      data         = new_data,
-      causes       = cr_causes(new_data, x@event_var),
-      covars       = x@covars,
-      time_var     = x@time_var,
-      event_var    = x@event_var,
-      id_var       = x@id_var,
-      sort_by_time = x@sort_by_time,
-      time_offset  = x@time_offset
-    )
-  }
+methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
+                   function(x, i, j, drop) {
+                     new_data <- if (missing(i)) x@data else x@data[i, , drop = FALSE]
+                     
+                     if (!missing(j)) {
+                       protected <- c(x@time_var, x@event_var,
+                                      if (nzchar(x@id_var)) x@id_var)
+                       bad <- intersect(protected, setdiff(names(new_data), j))
+                       if (length(bad))
+                         stop(sprintf(
+                           "Cannot drop protected column(s): %s",
+                           paste(bad, collapse = ", ")
+                         ), call. = FALSE)
+                       keep_cols <- union(protected, intersect(j, names(new_data)))
+                       new_data  <- new_data[, keep_cols, drop = FALSE]
+                     }
+                     
+                     new_covars <- x@covars[x@covars$covars_names %in% names(new_data), ,
+                                            drop = FALSE]
+                     
+                     methods::new("cr_data",
+                                  data         = new_data,
+                                  causes       = cr_causes(new_data, x@event_var),
+                                  covars       = new_covars,
+                                  time_var     = x@time_var,
+                                  event_var    = x@event_var,
+                                  id_var       = x@id_var,
+                                  sort_by_time = x@sort_by_time,
+                                  time_offset  = x@time_offset
+                     )
+                   }
 )

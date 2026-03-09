@@ -32,8 +32,7 @@ register_cr_model(
       splitrule = if (!is.null(args$splitrule)) args$splitrule else "logrankCR",
       ...
     )
-    structure(list(causes = cr@causes, fits = fits, model_key = "RSF"),
-              class = c("cr_model_rsf", "cr_model"))
+    list(causes = cr@causes, fits = fits, model_key = "RSF")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {

@@ -32,8 +32,7 @@ register_cr_model(
     fits <- lapply(cr@causes, function(k) {
       riskRegression::FGR(formula, data = cr@data, cause = k, ...)
     })
-    structure(list(causes = cr@causes, fits = fits, model_key = "FGR"),
-              class = c("cr_model_fgr", "cr_model"))
+    list(causes = cr@causes, fits = fits, model_key = "FGR")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {

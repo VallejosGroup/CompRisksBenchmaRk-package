@@ -53,13 +53,13 @@ NULL
 register_cr_model <- function(key, fit, predict_cif, info) {
   stopifnot(is.character(key), length(key) == 1, nzchar(key))
   stopifnot(is.function(fit), is.function(predict_cif), is.function(info))
-  
+
   if (exists(key, envir = .cr_models, inherits = FALSE))
     warning("Overwriting registered model: ", key, call. = FALSE)
-  
+
   assign(key, list(fit = fit, predict_cif = predict_cif, info = info),
          envir = .cr_models)
-  
+
   invisible(TRUE)
 }
 
@@ -87,8 +87,7 @@ get_cr_model <- function(key) {
 #'
 #' A thin wrapper around a model's `predict_cif` function that coerces
 #' `newdata` to a data frame and `time_grid` to numeric before dispatching.
-#' The registered model is looked up from `fit_obj$model_key`, which each
-#' model's `fit` function stores in the returned object via `structure()`.
+#' The registered model is looked up from `fit_obj$model_key`.
 #'
 #' @param fit_obj A fitted model object returned by the model's `fit` function.
 #' @param newdata Data frame of new observations.
@@ -119,3 +118,4 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
 #' @examples
 #' list_cr_models()
 list_cr_models <- function() ls(envir = .cr_models)
+

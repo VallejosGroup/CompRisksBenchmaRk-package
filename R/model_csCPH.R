@@ -27,8 +27,7 @@ register_cr_model(
     fits <- lapply(cr@causes, function(k) {
       riskRegression::CSC(formula = formula, data = cr@data, cause = k, ...)
     })
-    structure(list(causes = cr@causes, fits = fits, model_key = "csCPH"),
-              class = c("cr_model_csCPH", "cr_model"))
+    list(causes = cr@causes, fits = fits, model_key = "csCPH")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {
