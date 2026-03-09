@@ -23,7 +23,7 @@ register_cr_model(
 
     formula <- stats::reformulate(
       obj@covars$covars_names,
-      response = paste0("survival::Surv(", obj@time_var, ", ", obj@event_var, ")")
+      response = paste0("Surv(", obj@time_var, ", ", obj@event_var, ")")
     )
 
     fits <- randomForestSRC::rfsrc(
