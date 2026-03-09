@@ -126,15 +126,15 @@ Models are fitted by passing a `cr_data` object.
 time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
 
 set.seed(1)
-idx_tr <- sample(nrow(cr@data), floor(0.75 * nrow(cr@data)))
-cr_train <- cr_data(cr@data[ idx_tr, ], time_var = "time", event_var = "status")
-test     <- cr@data[-idx_tr, ]
+idx_tr   <- sample(nrow(cr@data), floor(0.75 * nrow(cr@data)))
+cr_train <- cr[idx_tr]
+cr_test  <- cr[-idx_tr]
 
 mdl <- get_cr_model("FGR")
 fit <- mdl$fit(cr = cr_train, args = list())
 
 # predict_cif() wrapper coerces newdata and time_grid before dispatching
-cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
+cif <- predict_cif(fit, newdata = cr_test@data, time_grid = time_grid)
 dim(cif)   # n_test x 2 causes x 10 time points
 ```
 

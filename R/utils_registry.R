@@ -157,3 +157,78 @@ cr_data <- function(data, time_var, event_var,
     time_offset  = time_offset
   )
 }
+
+#' cr_data class
+#'
+#' An S4 class that holds a validated and pre-processed data frame ready for
+#' competing risks model fitting, together with metadata derived during
+#' construction.
+#'
+#' @slot data         A data frame, sorted by \code{time_var} if
+#'   \code{sort_by_time = TRUE}.
+#' @slot causes       Sorted integer vector of competing cause codes (all
+#'   non-zero values found in \code{event_var}).
+#' @slot covars       A data frame with columns \code{covars_names} and
+#'   \code{covars_types} recording the name and original type of each
+#'   feature column.
+#' @slot time_var     Name of the time column.
+#' @slot event_var    Name of the event/status column.
+#' @slot id_var       Name of the subject ID column, or \code{""} if not
+#'   supplied.
+#' @slot sort_by_time Logical; whether rows were sorted by ascending time.
+#' @slot time_offset  Numeric offset that was added to times when the minimum
+#'   observed time was zero (0 means no offset was applied).
+#'
+#' @name cr_data-class
+#' @exportClass cr_data
+NULL
+
+
+#' @describeIn cr_data-class Print a concise summary of a \code{cr_data} object.
+#' @param object A \code{cr_data} object.
+#' @export
+methods::setMethod("show", "cr_data", function(object) {
+  cat("A cr_data object\n")
+  cat(sprintf("  Rows      : %d\n", nrow(object@data)))
+  cat(sprintf("  Causes    : %s\n", paste(object@causes, collapse = ", ")))
+  cat(sprintf("  time_var  : %s\n", object@time_var))
+  cat(sprintf("  event_var : %s\n", object@event_var))
+  if (nzchar(object@id_var))
+    cat(sprintf("  id_var    : %s\n", object@id_var))
+  cat(sprintf("  Covariates: %d  [%s]\n",
+              nrow(object@covars),
+              paste(object@covars$covars_names, collapse = ", ")))
+  if (object@time_offset != 0)
+    cat(sprintf("  time_offset applied: %g\n", object@time_offset))
+  invisible(object)
+})
+
+
+#' Subset rows of a cr_data object
+#'
+#' Extracts a row subset of the underlying data frame while preserving all
+#' metadata slots.  Causes are re-derived from the subset so that causes
+#' absent in the subset are dropped.
+#'
+#' @param x   A \code{cr_data} object.
+#' @param i   Row index (integer, logical, or character vector).
+#' @param j   Ignored; present for S4 compatibility.
+#' @param drop Ignored.
+#'
+#' @return A new \code{cr_data} object containing only the selected rows.
+#' @exportMethod [
+methods::setMethod("[", signature("cr_data", "ANY", "missing", "missing"),
+  function(x, i, j, drop) {
+    new_data <- x@data[i, , drop = FALSE]
+    methods::new("cr_data",
+      data         = new_data,
+      causes       = cr_causes(new_data, x@event_var),
+      covars       = x@covars,
+      time_var     = x@time_var,
+      event_var    = x@event_var,
+      id_var       = x@id_var,
+      sort_by_time = x@sort_by_time,
+      time_offset  = x@time_offset
+    )
+  }
+)
