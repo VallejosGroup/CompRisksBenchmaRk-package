@@ -8,6 +8,10 @@
 #' the default tuning grid sweeps 50 log-spaced \eqn{\lambda} values from 1
 #' down to \eqn{10^{-4}}.
 #'
+#' Factor covariates are expanded to dummy columns via \code{model.matrix}
+#' before fitting; the terms reference is stored on the fit object for aligned
+#' expansion at predict time.
+#'
 #' @name model_FGRP
 #' @keywords internal
 NULL
@@ -26,7 +30,14 @@ register_cr_model(
     if (is.null(lambda))
       stop("FGRP: lambda_seq must be provided via the grid.")
 
-    x_cols <- obj@covars$covars_names
+    X         <- .make_model_matrix(obj)
+    terms_ref <- list(tt = attr(X, "tt"), col_names = attr(X, "col_names"))
+    x_cols    <- terms_ref$col_names
+
+    # fastCrrp requires a plain data frame with the expanded columns
+    fit_data <- as.data.frame(X)
+    fit_data[[obj@time_var]]  <- obj@data[[obj@time_var]]
+    fit_data[[obj@event_var]] <- obj@data[[obj@event_var]]
 
     fits <- lapply(obj@causes, function(k) {
       frm_k <- stats::as.formula(paste0(
@@ -36,7 +47,7 @@ register_cr_model(
       ))
       fp <- fastcmprsk::fastCrrp(
         formula     = frm_k,
-        data        = obj@data,
+        data        = fit_data,
         penalty     = if (!is.null(args$penalty))     args$penalty     else "LASSO",
         nlambda     = 1,
         lambda      = as.numeric(lambda),
@@ -44,38 +55,34 @@ register_cr_model(
         alpha       = if (!is.null(args$alpha))       args$alpha       else 0,
         ...
       )
-      if (!is.null(fp[["coef"]]) &&
-          length(fp[["coef"]]) == length(x_cols)) {
-        cf        <- as.vector(fp[["coef"]])
-        names(cf) <- x_cols
-        fp[["coef"]] <- cf
-      }
+      cf        <- as.vector(fp[["coef"]])
+      names(cf) <- x_cols
+      fp[["coef"]] <- cf
       list(fp = fp)
     })
 
     list(causes = obj@causes, fits = fits, x_cols = x_cols,
-         model_key = "FGRP")
+         terms_ref = terms_ref, model_key = "FGRP")
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {
     if (!methods::is(newdata, "cr_data"))
       stop("`newdata` must be a cr_data object.", call. = FALSE)
-    newdata <- newdata@data
 
-    n   <- nrow(newdata)
+    X   <- .make_model_matrix(newdata, fit_obj)
+    n   <- nrow(X)
     K   <- length(fit_obj$causes)
     out <- array(0, dim = c(n, K, length(time_grid)))
 
     for (k in seq_len(K)) {
       fp    <- fit_obj$fits[[k]]$fp
-      X     <- as.matrix(newdata[, fit_obj$x_cols, drop = FALSE])
       beta  <- as.vector(fp[["coef"]])
       bfitj <- fp[["breslowJump"]][[2]]
       tt    <- as.vector(fp[["uftime"]])
 
       H0       <- cumsum(bfitj)
       H0_times <- stats::approx(x = tt, y = H0, xout = time_grid,
-                                 method = "constant", f = 0, rule = 2)$y
+                                method = "constant", f = 0, rule = 2)$y
       eta  <- drop(X %*% beta)
       lhat <- as.matrix(H0_times) %*% t(exp(eta))
       out[, k, ] <- t(1 - exp(-lhat))

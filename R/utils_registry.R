@@ -62,23 +62,23 @@ cr_data <- function(data, time_var, event_var,
                     sort_by_time = TRUE,
                     id_var       = NULL,
                     time_offset  = 0) {
-  
+
   # --- Input validation ---
   if (!is.data.frame(data))
     stop("`data` must be a data frame.", call. = FALSE)
   if (nrow(data) == 0)
     stop("`data` has no rows.", call. = FALSE)
-  
+
   if (!is.character(time_var) || length(time_var) != 1 || !nzchar(time_var))
     stop("`time_var` must be a single non-empty string.", call. = FALSE)
   if (!is.character(event_var) || length(event_var) != 1 || !nzchar(event_var))
     stop("`event_var` must be a single non-empty string.", call. = FALSE)
-  
+
   if (!time_var %in% names(data))
     stop(sprintf("`time_var` '%s' not found in `data`.", time_var), call. = FALSE)
   if (!event_var %in% names(data))
     stop(sprintf("`event_var` '%s' not found in `data`.", event_var), call. = FALSE)
-  
+
   if (!is.null(id_var)) {
     if (!is.character(id_var) || length(id_var) != 1 || !nzchar(id_var))
       stop("`id_var` must be a single non-empty string.", call. = FALSE)
@@ -87,22 +87,22 @@ cr_data <- function(data, time_var, event_var,
     if (any(is.na(data[[id_var]])))
       stop(sprintf("`id_var` '%s' contains NA values.", id_var), call. = FALSE)
   }
-  
+
   if (!is.numeric(data[[time_var]]))
     stop(sprintf("`time_var` '%s' must be numeric.", time_var), call. = FALSE)
   if (any(is.na(data[[time_var]])))
     stop(sprintf("`time_var` '%s' contains NA values.", time_var), call. = FALSE)
-  
+
   event <- data[[event_var]]
   if (!is.numeric(event) && !is.integer(event) && !is.factor(event))
     stop(sprintf("`event_var` '%s' must be numeric, integer, or factor.", event_var),
          call. = FALSE)
   if (any(is.na(event)))
     stop(sprintf("`event_var` '%s' contains NA values.", event_var), call. = FALSE)
-  
+
   if (!is.numeric(time_offset) || length(time_offset) != 1 || time_offset < 0)
     stop("`time_offset` must be a single non-negative number.", call. = FALSE)
-  
+
   # --- Zero-time guard ---
   min_time <- suppressWarnings(min(data[[time_var]], na.rm = TRUE))
   if (is.finite(min_time) && min_time == 0) {
@@ -114,10 +114,10 @@ cr_data <- function(data, time_var, event_var,
       )
     data[[time_var]] <- data[[time_var]] + time_offset
   }
-  
+
   # --- Type coercion ---
   data[[event_var]] <- as.integer(as.character(data[[event_var]]))
-  
+
   feature_cols <- setdiff(names(data), c(time_var, event_var, id_var))
   covars_types <- vector("character", length(feature_cols))
   for (i in seq_along(feature_cols)) {
@@ -135,26 +135,26 @@ cr_data <- function(data, time_var, event_var,
       data[[feature_cols[[i]]]] <- as.numeric(x)
     }
   }
-  
+
   # --- Optional sort by time ---
   if (sort_by_time)
     data <- data[order(data[[time_var]]), , drop = FALSE]
-  
+
   # --- Cause and covariate extraction ---
   causes <- cr_causes(data, event_var)
   covars <- data.frame(covars_names = feature_cols,
                        covars_types = covars_types,
                        stringsAsFactors = FALSE)
-  
+
   methods::new("cr_data",
-               data         = data,
-               causes       = causes,
-               covars       = covars,
-               time_var     = time_var,
-               event_var    = event_var,
-               id_var       = if (!is.null(id_var)) id_var else "",
-               sort_by_time = sort_by_time,
-               time_offset  = time_offset
+    data         = data,
+    causes       = causes,
+    covars       = covars,
+    time_var     = time_var,
+    event_var    = event_var,
+    id_var       = if (!is.null(id_var)) id_var else "",
+    sort_by_time = sort_by_time,
+    time_offset  = time_offset
   )
 }
 
@@ -222,34 +222,93 @@ methods::setMethod("show", "cr_data", function(object) {
 #' @return A new \code{cr_data} object.
 #' @exportMethod [
 methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
-                   function(x, i, j, drop) {
-                     new_data <- if (missing(i)) x@data else x@data[i, , drop = FALSE]
-                     
-                     if (!missing(j)) {
-                       protected <- c(x@time_var, x@event_var,
-                                      if (nzchar(x@id_var)) x@id_var)
-                       bad <- intersect(protected, setdiff(names(new_data), j))
-                       if (length(bad))
-                         stop(sprintf(
-                           "Cannot drop protected column(s): %s",
-                           paste(bad, collapse = ", ")
-                         ), call. = FALSE)
-                       keep_cols <- union(protected, intersect(j, names(new_data)))
-                       new_data  <- new_data[, keep_cols, drop = FALSE]
-                     }
-                     
-                     new_covars <- x@covars[x@covars$covars_names %in% names(new_data), ,
-                                            drop = FALSE]
-                     
-                     methods::new("cr_data",
-                                  data         = new_data,
-                                  causes       = cr_causes(new_data, x@event_var),
-                                  covars       = new_covars,
-                                  time_var     = x@time_var,
-                                  event_var    = x@event_var,
-                                  id_var       = x@id_var,
-                                  sort_by_time = x@sort_by_time,
-                                  time_offset  = x@time_offset
-                     )
-                   }
+  function(x, i, j, drop) {
+    new_data <- if (missing(i)) x@data else x@data[i, , drop = FALSE]
+
+    if (!missing(j)) {
+      protected <- c(x@time_var, x@event_var,
+                     if (nzchar(x@id_var)) x@id_var)
+      bad <- intersect(protected, setdiff(names(new_data), j))
+      if (length(bad))
+        stop(sprintf(
+          "Cannot drop protected column(s): %s",
+          paste(bad, collapse = ", ")
+        ), call. = FALSE)
+      keep_cols <- union(protected, intersect(j, names(new_data)))
+      new_data  <- new_data[, keep_cols, drop = FALSE]
+    }
+
+    new_covars <- x@covars[x@covars$covars_names %in% names(new_data), ,
+                           drop = FALSE]
+
+    methods::new("cr_data",
+      data         = new_data,
+      causes       = cr_causes(new_data, x@event_var),
+      covars       = new_covars,
+      time_var     = x@time_var,
+      event_var    = x@event_var,
+      id_var       = x@id_var,
+      sort_by_time = x@sort_by_time,
+      time_offset  = x@time_offset
+    )
+  }
 )
+
+#' Build or align a model matrix for FGRP
+#'
+#' At fit time (\code{fit_obj = NULL}): expands all covariates to a numeric
+#' matrix via \code{model.matrix}, drops zero-variance columns, and stores
+#' the \code{terms} object and final column names as attributes for later
+#' alignment.
+#'
+#' At predict time (\code{fit_obj} supplied): re-expands \code{newdata} using
+#' the stored \code{terms} reference, aligns columns to those seen at fit time
+#' (filling missing columns with 0), and returns the numeric matrix.
+#'
+#' @param obj     A \code{cr_data} object.
+#' @param fit_obj At predict time, the fitted FGRP list object (must contain
+#'   \code{terms_ref} with elements \code{tt} and \code{col_names}).
+#'   Pass \code{NULL} at fit time.
+#'
+#' @return A numeric matrix.  At fit time the matrix carries two attributes:
+#'   \code{tt} (the \code{terms} object) and \code{col_names} (character
+#'   vector of retained column names).
+#' @noRd
+.make_model_matrix <- function(obj, fit_obj = NULL) {
+  data <- obj@data
+
+  if (is.null(fit_obj)) {
+    # --- fit time ---
+    rhs     <- paste(obj@covars$covars_names, collapse = " + ")
+    formula <- stats::as.formula(paste("~", rhs))
+    mf      <- stats::model.frame(formula, data = data, na.action = stats::na.fail)
+    tt      <- attr(mf, "terms")
+    X       <- stats::model.matrix(tt, data = mf)[, -1, drop = FALSE]  # drop intercept
+
+    # drop zero-variance columns
+    keep <- apply(X, 2, stats::var) > 0
+    X    <- X[, keep, drop = FALSE]
+
+    attr(X, "tt")        <- tt
+    attr(X, "col_names") <- colnames(X)
+    X
+
+  } else {
+    # --- predict time ---
+    tt        <- fit_obj$terms_ref$tt
+    col_names <- fit_obj$terms_ref$col_names
+
+    mf <- stats::model.frame(tt, data = data,
+                             na.action    = stats::na.pass,
+                             xlev         = attr(tt, "xlev"))
+    X  <- stats::model.matrix(tt, data = mf)[, -1, drop = FALSE]
+
+    # align to fit-time columns, filling any missing with 0
+    missing_cols           <- setdiff(col_names, colnames(X))
+    extra                  <- matrix(0, nrow = nrow(X),
+                                     ncol = length(missing_cols),
+                                     dimnames = list(NULL, missing_cols))
+    X <- cbind(X, extra)[, col_names, drop = FALSE]
+    X
+  }
+}

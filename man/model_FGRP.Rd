@@ -12,5 +12,9 @@ Available under the key \code{"FGRP"}.  Requires the **fastcmprsk**
 package.  This model requires hyperparameter tuning (`needs_tuning = TRUE`);
 the default tuning grid sweeps 50 log-spaced \eqn{\lambda} values from 1
 down to \eqn{10^{-4}}.
+
+Factor covariates are expanded to dummy columns via \code{model.matrix}
+before fitting; the terms reference is stored on the fit object for aligned
+expansion at predict time.
 }
 \keyword{internal}
