@@ -127,14 +127,18 @@ Models are fitted by passing a `cr_data` object.  For demonstration
 purposes we fit and predict on the full dataset; `predict_cif()` dispatches
 internally via `fit_obj$model_key` and returns an `[n, K, Tm]` array.
 
-```{r fit-predict}
-time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
+```{r fit-predict, warning = FALSE}
+# Cap time grid at the observed data range to avoid extrapolation
+max_time  <- floor(max(cr@data[[cr@time_var]]))
+time_grid <- seq(1, max_time, by = 1)
 
 # --- FGR ---
 fit_FGR  <- fit_cr_model("FGR", cr)
 cif_FGR  <- predict_cif(fit_FGR,  newdata = cr, time_grid = time_grid)
 
 # --- csCPH ---
+# Note: riskRegression::predictRisk may warn about predictions outside [0,1]
+# when predicting on training data with extreme covariate combinations.
 fit_csCPH <- fit_cr_model("csCPH", cr)
 cif_csCPH <- predict_cif(fit_csCPH, newdata = cr, time_grid = time_grid)
 
@@ -317,7 +321,8 @@ cif_list <- lapply(seq_len(imp$m), function(k) {
   cr_k <- cr_data(tr_k, time_var = cr@time_var,
                   event_var = cr@event_var)
   fit_k <- fit_cr_model("FGR", cr_k)
-  predict_cif(fit_k, newdata = te_k, time_grid = time_grid)
+  cr_te_k <- cr_data(te_k, time_var = cr@time_var, event_var = cr@event_var)
+  predict_cif(fit_k, newdata = cr_te_k, time_grid = time_grid)
 })
 
 cif_pooled <- pool_cifs_mean(cif_list)

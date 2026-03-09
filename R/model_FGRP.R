@@ -58,6 +58,10 @@ register_cr_model(
   },
 
   predict_cif = function(fit_obj, newdata, time_grid) {
+    if (!methods::is(newdata, "cr_data"))
+      stop("`newdata` must be a cr_data object.", call. = FALSE)
+    newdata <- newdata@data
+
     n   <- nrow(newdata)
     K   <- length(fit_obj$causes)
     out <- array(0, dim = c(n, K, length(time_grid)))

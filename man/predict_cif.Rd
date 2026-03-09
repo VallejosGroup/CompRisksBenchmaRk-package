@@ -9,8 +9,7 @@ predict_cif(fit_obj, newdata, time_grid)
 \arguments{
 \item{fit_obj}{A fitted model object returned by [fit_cr_model()].}
 
-\item{newdata}{A [cr_data()] object or a plain data frame of new
-observations.}
+\item{newdata}{A [cr_data()] object of new observations.}
 
 \item{time_grid}{Numeric vector of evaluation times.}
 }
@@ -18,9 +17,9 @@ observations.}
 A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
 }
 \description{
-A thin wrapper around a model's `predict_cif` function that extracts the
-data frame from a [cr_data()] object (or accepts a plain data frame) and
-coerces `time_grid` to numeric before dispatching.
+A thin wrapper around a model's `predict_cif` function that validates
+`newdata` as a [cr_data()] object and coerces `time_grid` to numeric
+before dispatching.
 The registered model is looked up from `fit_obj$model_key`.
 }
 \examples{
