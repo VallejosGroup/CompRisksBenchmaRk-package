@@ -14,25 +14,25 @@ NULL
 register_cr_model(
   key = "RSF",
 
-  fit = function(data, time_var, event_var, args = list(), ...) {
+  fit = function(cr, args = list(), ...) {
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
 
-    causes  <- cr_causes(data, event_var)
-    covars  <- setdiff(names(data), c(time_var, event_var))
-    formula <- stats::reformulate(covars,
-                 response = paste0("survival::Surv(", time_var, ", ", event_var, ")"))
+    formula <- stats::reformulate(
+      cr@covars$covars_names,
+      response = paste0("survival::Surv(", cr@time_var, ", ", cr@event_var, ")")
+    )
 
     fits <- randomForestSRC::rfsrc(
       formula   = formula,
-      data      = data,
+      data      = cr@data,
       ntree     = if (!is.null(args$ntree))     args$ntree     else 500,
       mtry      = if (!is.null(args$mtry))      args$mtry      else NULL,
       nodesize  = if (!is.null(args$nodesize))  args$nodesize  else NULL,
       splitrule = if (!is.null(args$splitrule)) args$splitrule else "logrankCR",
       ...
     )
-    structure(list(causes = causes, fits = fits, model_key = "RSF"),
+    structure(list(causes = cr@causes, fits = fits, model_key = "RSF"),
               class = c("cr_model_rsf", "cr_model"))
   },
 

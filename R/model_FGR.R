@@ -18,21 +18,21 @@ NULL
 register_cr_model(
   key = "FGR",
 
-  fit = function(data, time_var, event_var, args = list(), ...) {
+  fit = function(cr, args = list(), ...) {
     if (!requireNamespace("riskRegression", quietly = TRUE))
       stop("Please install 'riskRegression'.")
     if (!requireNamespace("prodlim", quietly = TRUE))
       stop("Please install 'prodlim'.")
 
-    causes  <- cr_causes(data, event_var)
-    covars  <- setdiff(names(data), c(time_var, event_var))
-    formula <- stats::reformulate(covars,
-                 response = paste0("prodlim::Hist(", time_var, ", ", event_var, ")"))
+    formula <- stats::reformulate(
+      cr@covars$covars_names,
+      response = paste0("prodlim::Hist(", cr@time_var, ", ", cr@event_var, ")")
+    )
 
-    fits <- lapply(causes, function(k) {
-      riskRegression::FGR(formula, data = data, cause = k, ...)
+    fits <- lapply(cr@causes, function(k) {
+      riskRegression::FGR(formula, data = cr@data, cause = k, ...)
     })
-    structure(list(causes = causes, fits = fits, model_key = "FGR"),
+    structure(list(causes = cr@causes, fits = fits, model_key = "FGR"),
               class = c("cr_model_fgr", "cr_model"))
   },
 

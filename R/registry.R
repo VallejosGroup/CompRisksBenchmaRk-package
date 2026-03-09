@@ -4,11 +4,9 @@
 #' A lightweight registry that maps string keys to model objects.  Each
 #' registered model must expose three functions:
 #' \describe{
-#'   \item{fit}{`fit(data, time_var, event_var, args, ...)` — trains the model on a
-#'     data frame, using `time_var` and `event_var` to identify the time and
-#'     event columns. Grid parameters are passed via `args`; any additional
-#'     arguments for the underlying fitting function can be passed via `...`.}
-#'   \item{predict_cif}{`predict_cif(fit_obj, newdata, time_grid)` — returns a
+#'   \item{fit}{`fit(cr, args, ...)` — trains the model on a \code{cr_data}
+#'     object (see \code{cr_data()}). Grid parameters are passed via `args`; any
+#'     additional arguments for the underlying fitting function via `...`.}
 #'     3-D array of cumulative incidence function (CIF) predictions with
 #'     dimensions `[n, K, |time_grid|]`.}
 #'   \item{info}{`info()` — returns a named list with at least `name`,
@@ -24,11 +22,9 @@ NULL
 #' by key and used inside [nested_cv_from_bench()].
 #'
 #' @param key A single non-empty character string used to identify the model.
-#' @param fit A function with signature `fit(data, time_var, event_var, args, ...)`
-#'   where `data` is a data frame, `time_var` / `event_var` are character
-#'   strings naming the respective columns, `args` is a named list of
-#'   grid-tuned arguments, and `...` accepts any further arguments passed
-#'   directly to the underlying fitting function.
+#'   \item{fit}{`fit(cr, args, ...)` — trains the model on a \code{cr_data}
+#'     object (see \code{cr_data()}). Grid parameters are passed via `args`; any
+#'     additional arguments for the underlying fitting function via `...`.}
 #' @param predict_cif A function with signature
 #'   `predict_cif(fit_obj, newdata, time_grid)` that returns a 3-D numeric array
 #'   of dimensions `[n, K, Tm]`.
@@ -41,8 +37,8 @@ NULL
 #' @examples
 #' register_cr_model(
 #'   key = "my_model",
-#'   fit = function(data, time_var, event_var, args = list(), ...) {
-#'     list(intercept = mean(data[[time_var]]), model_key = "my_model")
+#'   fit = function(cr, args = list(), ...) {
+#'     list(intercept = mean(cr@data[[cr@time_var]]), model_key = "my_model")
 #'   },
 #'   predict_cif = function(fit_obj, newdata, time_grid) {
 #'     n <- nrow(newdata); K <- 1; Tm <- length(time_grid)
@@ -101,8 +97,8 @@ get_cr_model <- function(key) {
 #'
 #' @examples
 #' \dontrun{
-#' fit <- get_cr_model("FGR")$fit(train, time_var = "time",
-#'                                event_var = "event", args = list())
+#' fit <- get_cr_model("FGR")$fit(cr_data(train, time_var = "time",
+#'                               event_var = "event"), args = list())
 #' cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {

@@ -193,10 +193,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       for (m in seq_len(m_outer)) {
         tr_m <- outer_data[[m]]$train
         te_m <- outer_data[[m]]$test
-        fit  <- mdl$fit(data      = tr_m,
-                        time_var  = time_var,
-                        event_var = event_var,
-                        args      = list())
+        fit  <- mdl$fit(cr   = cr_data(tr_m, time_var = time_var,
+                                         event_var = event_var),
+                        args = list())
         cif_list[[m]] <- mdl$predict_cif(fit, newdata = te_m, time_grid = times)
       }
       pred  <- pool_cifs_mean(cif_list)
@@ -241,10 +240,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           for (m in seq_len(m_inner)) {
             tr_m   <- jj[[m]]$train
             va_m   <- jj[[m]]$val
-            fit_in <- mdl$fit(data      = tr_m,
-                              time_var  = time_var,
-                              event_var = event_var,
-                              args      = cfg)
+            fit_in <- mdl$fit(cr   = cr_data(tr_m, time_var = time_var,
+                                               event_var = event_var),
+                              args = cfg)
             cif_list[[m]] <- mdl$predict_cif(fit_in, newdata = va_m, time_grid = times)
           }
 
@@ -296,10 +294,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         for (mii in seq_len(m_outer)) {
           tr_k  <- outer_data[[mii]]$train
           te_k  <- outer_data[[mii]]$test
-          fit_i <- mdl$fit(data      = tr_k,
-                           time_var  = time_var,
-                           event_var = event_var,
-                           args      = cfg_i)
+          fit_i <- mdl$fit(cr   = cr_data(tr_k, time_var = time_var,
+                                            event_var = event_var),
+                           args = cfg_i)
           cif_list[[mii]] <- mdl$predict_cif(fit_i, newdata = te_k, time_grid = times)
           if (frgp_details) {
             fit_list[[mii]]  <- fit_i

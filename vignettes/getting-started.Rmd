@@ -22,7 +22,7 @@ knitr::opts_chunk$set(
 models in the presence of competing risks. Its core features are:
 
 - A **model registry** that lets you plug in any model with a common
-  `fit(data, time_var, event_var, args, ...)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
+  `fit(cr, args, ...)` / `predict_cif(fit_obj, newdata, time_grid)` interface.
 - A **nested cross-validation** engine (`nested_cv_from_bench`) that reads the
   pre-built benchmark directory layout produced by the companion Python pipeline.
 - A **metrics suite** covering Brier score, IBS, AUC, C-index, calibration
@@ -61,7 +61,6 @@ library(survival)
 data(pbc, package = "survival")
 pbc2        <- pbc[!is.na(pbc$trt), ]         # randomised patients only
 pbc2$time   <- pbc2$time / 365.25             # days -> years
-pbc2$status <- as.integer(as.character(pbc2$status))  # 0=censored, 1=transplant, 2=dead
 
 feature_cols <- c("age", "bili", "albumin", "protime", "platelet")
 pbc2         <- pbc2[, c("time", "status", feature_cols)]
@@ -70,12 +69,14 @@ pbc2         <- pbc2[complete.cases(pbc2), ]
 table(pbc2$status)
 ```
 
-`prepare_data()` standardises column names and guards against a zero minimum
-time:
+`cr_data()` validates inputs, coerces the event column, records covariate
+types, and sorts by time:
 
 ```{r prepare}
-dat <- prepare_data(pbc2, time_col = "time", event_col = "status")
-head(dat[, c("time", "event")])
+cr <- cr_data(pbc2, time_var = "time", event_var = "status")
+head(cr@data[, c("time", "status")])
+cr@causes
+cr@covars
 ```
 
 ---
@@ -89,16 +90,15 @@ get_cr_model("FGR")$info()
 
 ### Registering a custom model
 
-Any model whose `fit` accepts `(data, time_var, event_var, args, ...)` and whose
+Any model whose `fit` accepts a `cr_data` object and whose
 `predict_cif` returns a `[n, K, Tm]` array can be registered.
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
   key = "MyModel",
-  fit = function(data, time_var, event_var, args = list(), ...) {
-    causes <- cr_causes(data, event_var)
-    # ... train model ...
-    structure(list(causes = causes, fit = my_fit, model_key = "MyModel"),
+  fit = function(cr, args = list(), ...) {
+    # ... train model using cr@data, cr@time_var, cr@event_var, cr@causes ...
+    structure(list(causes = cr@causes, fit = my_fit, model_key = "MyModel"),
               class = c("cr_model_mymodel", "cr_model"))
   },
   predict_cif = function(fit_obj, newdata, time_grid) {
@@ -120,22 +120,18 @@ register_cr_model(
 
 ## 3  Fit and predict manually
 
-Models are fitted by passing a data frame and the names of the time and event
-columns. No column naming convention is assumed.
+Models are fitted by passing a `cr_data` object.
 
 ```{r fit-predict}
 time_grid <- seq(1, 10, by = 1)   # evaluation times: years 1-10
 
 set.seed(1)
-idx_tr <- sample(nrow(dat), floor(0.75 * nrow(dat)))
-train  <- dat[ idx_tr, ]
-test   <- dat[-idx_tr, ]
+idx_tr <- sample(nrow(cr@data), floor(0.75 * nrow(cr@data)))
+cr_train <- cr_data(cr@data[ idx_tr, ], time_var = "time", event_var = "status")
+test     <- cr@data[-idx_tr, ]
 
 mdl <- get_cr_model("FGR")
-fit <- mdl$fit(data      = train,
-               time_var  = "time",
-               event_var = "event",
-               args      = list())
+fit <- mdl$fit(cr = cr_train, args = list())
 
 # predict_cif() wrapper coerces newdata and time_grid before dispatching
 cif <- predict_cif(fit, newdata = test, time_grid = time_grid)
@@ -216,9 +212,9 @@ print(du$plot)
 ## 7  Nested cross-validation (benchmark workflow)
 
 `nested_cv_from_bench()` reads the pre-built directory layout produced by the
-companion Python pipeline. It passes `time_var = "time"` and
-`event_var = "event"` (the standardised names from `prepare_data()`) to every
-`fit()` call internally.
+companion Python pipeline. It constructs a `cr_data` object internally for each fold
+(using the standardised `"time"` / `"event"` column names) before calling
+each model's `fit()` function.
 
 ```{r nested-cv, eval = FALSE}
 results <- nested_cv_from_bench(
@@ -275,9 +271,8 @@ imp <- impute_split(
 cif_list <- lapply(seq_len(imp$m), function(k) {
   tr_k <- imp$imputations[[k]]$train
   te_k <- imp$imputations[[k]]$test
-  fit_k <- mdl$fit(data      = tr_k,
-                   time_var  = "time",
-                   event_var = "event",
+  cr_k  <- cr_data(tr_k, time_var = "time", event_var = "event")
+  fit_k <- mdl$fit(cr = cr_k,
   mdl$predict_cif(fit_k, newdata = te_k, time_grid = time_grid)
 })
 
