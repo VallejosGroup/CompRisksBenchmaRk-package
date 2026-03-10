@@ -196,10 +196,10 @@ get_results <- function(data_root,
 
       cr_test <- cr_data(df_test, time_var = "time", event_var = "event")
 
-      res[[model]][[v]] <- score_from_cifs(
+      res[[model]][[v]] <- calculate_metrics(
         cif        = out,
         cr         = cr_test,
-        times      = times,
+        eval_times = times,
         metrics    = c("brier", "auc", "calib_measures"),
         summary    = "ibs",
         cens.method = "ipcw",
