@@ -57,7 +57,7 @@ compute_rmlt_from_cif <- function(out, times, tau = max(times)) {
 #' Convenience helper to pull the named coefficient vector from a fitted
 #' FGRP model object (as returned by the registered `"FGRP"` model).
 #'
-#' @param fit_obj A `cr_model_fgrp` object returned by the FGRP `fit()`
+#' @param fit_obj A fit object returned by the FGRP `fit()`
 #'   function.
 #' @param tol     Threshold below which absolute coefficient values are
 #'   considered zero (default `1e-8`).
@@ -194,13 +194,12 @@ get_results <- function(data_root,
         print(p)
       }
 
+      cr_test <- cr_data(df_test, time_var = "time", event_var = "event")
+
       res[[model]][[v]] <- score_from_cifs(
         out        = out,
-        test       = df_test,
+        test       = cr_test,
         times      = times,
-        causes     = causes,
-        time_col   = "time",
-        status_col = "event",
         metrics    = c("brier", "auc", "calib_measures"),
         summary    = "ibs",
         cens.method = "ipcw",
@@ -214,11 +213,8 @@ get_results <- function(data_root,
                                                       tau = max(times))
       res_rmlt[[model]][[v]] <- score_from_rmlt(
         rmlt       = all_rmlt[[model]][[v]],
-        test       = df_test,
+        test       = cr_test,
         times      = max(times),
-        causes     = causes,
-        time_col   = "time",
-        status_col = "event",
         metrics    = "cidx_pec"
       )
     }

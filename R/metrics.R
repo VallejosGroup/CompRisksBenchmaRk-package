@@ -14,13 +14,9 @@ NULL
 #' @param out 3-D numeric array with dimensions `[n, K, Tm]`, where `n` is
 #'   the number of subjects, `K` the number of competing causes, and `Tm` the
 #'   number of evaluation times.
-#' @param test Data frame of test-set outcomes with at least columns
-#'   `time_col` and `status_col`.
+#' @param test A [cr_data()] object providing the test-set outcomes, time and
+#'   event variable names, and cause codes.
 #' @param times Numeric vector of evaluation times (length `Tm`).
-#' @param causes Integer vector of cause codes corresponding to the `K`
-#'   second dimension of `out`.
-#' @param time_col   Name of the time column in `test` (default `"time"`).
-#' @param status_col Name of the status column in `test` (default `"event"`).
 #' @param metrics Character vector of metrics to compute. Supported values:
 #'   `"brier"`, `"auc"`, `"cidx_pec"`, `"cidx_survM"`, `"calib_measures"`.
 #' @param summary Character vector of Brier-score summaries:
@@ -35,15 +31,21 @@ NULL
 #'   `cause_bs`, `cause_ibs`, `cause_auc`, `cause_cindex_pec`,
 #'   `cause_cindex_survM`, `cause_calib_measures`.
 #' @export
-score_from_cifs <- function(out, test, times, causes,
-                             time_col     = "time",
-                             status_col   = "event",
+score_from_cifs <- function(out, test, times,
                              metrics      = c("brier", "auc"),
                              summary      = c("ibs", "risks"),
                              cens.method  = "ipcw",
                              cens.model   = "km",
-                             cens.code    = 0L,
+                             cens.code    = 0,
                              se.fit       = FALSE) {
+  if (!methods::is(test, "cr_data"))
+    stop("`test` must be a cr_data object.", call. = FALSE)
+
+  test_data  <- test@data
+  time_col   <- test@time_var
+  status_col <- test@event_var
+  causes     <- test@causes
+
   d  <- dim(out)
   n  <- d[1L]; K <- d[2L]; Tm <- d[3L]
 
@@ -89,7 +91,7 @@ score_from_cifs <- function(out, test, times, causes,
       sc <- riskRegression::Score(
         object      = preds,
         formula     = f,
-        data        = test,
+        data        = test_data,
         metrics     = rr_metrics,
         summary     = rr_summary,
         times       = times,
@@ -113,7 +115,7 @@ score_from_cifs <- function(out, test, times, causes,
       cidx_pec <- pec::cindex(
         object      = preds,
         formula     = f,
-        data        = test,
+        data        = test_data,
         eval.times  = times,
         pred.times  = times,
         cause       = k,
@@ -127,8 +129,8 @@ score_from_cifs <- function(out, test, times, causes,
     if (comp_survM) {
       cif_mat <- preds[[k_name]]
       cidx_survM <- lapply(seq_len(ncol(cif_mat)), function(j) {
-        CindexCR(time      = test$time,
-                 status    = test$event,
+        CindexCR(time      = test_data[[time_col]],
+                 status    = test_data[[status_col]],
                  predicted = 1 - cif_mat[, j],
                  Cause_int = k)
       })
@@ -141,9 +143,9 @@ score_from_cifs <- function(out, test, times, causes,
     if (comp_calib) {
       cm <- CalibrationPlot(
         predictions      = preds[[k_name]],
-        data             = test,
-        time             = test$time,
-        status           = test$event,
+        data             = test_data,
+        time             = test_data[[time_col]],
+        status           = test_data[[status_col]],
         tau              = times,
         cause            = k,
         cens.code        = cens.code,
@@ -173,11 +175,9 @@ score_from_cifs <- function(out, test, times, causes,
 #' of RMLT values rather than a full CIF array.
 #'
 #' @param rmlt 2-D matrix `[n, K]` of RMLT values.
-#' @param test Data frame of outcomes.
+#' @param test A [cr_data()] object providing test-set outcomes, time and
+#'   event variable names, and cause codes.
 #' @param times Numeric scalar or vector of evaluation times.
-#' @param causes Integer vector of cause codes.
-#' @param time_col   Column name for times (default `"time"`).
-#' @param status_col Column name for status (default `"event"`).
 #' @param metrics Character vector; only `"cidx_pec"` is currently
 #'   supported.
 #' @param cens.method,cens.model,cens.code,se.fit Passed through (unused
@@ -185,14 +185,20 @@ score_from_cifs <- function(out, test, times, causes,
 #'
 #' @return A list with element `cause_cindex_pec`.
 #' @export
-score_from_rmlt <- function(rmlt, test, times, causes,
-                             time_col     = "time",
-                             status_col   = "event",
+score_from_rmlt <- function(rmlt, test, times,
                              metrics      = "cidx_pec",
                              cens.method  = "ipcw",
                              cens.model   = "km",
-                             cens.code    = 0L,
+                             cens.code    = 0,
                              se.fit       = FALSE) {
+  if (!methods::is(test, "cr_data"))
+    stop("`test` must be a cr_data object.", call. = FALSE)
+
+  test_data  <- test@data
+  time_col   <- test@time_var
+  status_col <- test@event_var
+  causes     <- test@causes
+
   f        <- stats::as.formula(
     sprintf("prodlim::Hist(%s,%s) ~ 1", time_col, status_col)
   )
@@ -212,7 +218,7 @@ score_from_rmlt <- function(rmlt, test, times, causes,
       cidx_pec <- pec::cindex(
         object      = preds_list,
         formula     = f,
-        data        = test,
+        data        = test_data,
         eval.times  = times,
         cens.model  = "marginal",
         splitMethod = "noPlan",

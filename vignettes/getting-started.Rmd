@@ -180,7 +180,6 @@ scores_brier_FGR <- score_from_cifs(
   out     = cif_FGR,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "brier",
   summary = "ibs"
 )
@@ -188,7 +187,6 @@ scores_auc_FGR <- score_from_cifs(
   out     = cif_FGR,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "auc"
 )
 
@@ -197,7 +195,6 @@ scores_brier_csCPH <- score_from_cifs(
   out     = cif_csCPH,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "brier",
   summary = "ibs"
 )
@@ -205,7 +202,6 @@ scores_auc_csCPH <- score_from_cifs(
   out     = cif_csCPH,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "auc"
 )
 
@@ -214,7 +210,6 @@ scores_brier_RSF <- score_from_cifs(
   out     = cif_RSF,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "brier",
   summary = "ibs"
 )
@@ -222,7 +217,6 @@ scores_auc_RSF <- score_from_cifs(
   out     = cif_RSF,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "auc"
 )
 
@@ -231,7 +225,6 @@ scores_brier_FGRP <- score_from_cifs(
   out     = cif_FGRP,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "brier",
   summary = "ibs"
 )
@@ -239,7 +232,6 @@ scores_auc_FGRP <- score_from_cifs(
   out     = cif_FGRP,
   test    = cr@data,
   times   = time_grid,
-  causes  = cr@causes,
   metrics = "auc"
 )
 
@@ -256,8 +248,7 @@ scores <- lapply(cifs, function(cif)
     out     = cif,
     test    = cr@data,
     times   = time_grid,
-    causes  = cr@causes,
-    metrics = c("brier", "auc"),
+      metrics = c("brier", "auc"),
     summary = "ibs"
   )
 )
