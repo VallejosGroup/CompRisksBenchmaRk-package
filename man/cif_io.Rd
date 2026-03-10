@@ -2,8 +2,8 @@
 % Please edit documentation in R/cif_io.R
 \name{cif_io}
 \alias{cif_io}
-\title{CIF Array and Design Matrix Utilities}
+\title{CIF Array and Storage Utilities}
 \description{
 Functions for pooling, saving, and storing CIF prediction
-  arrays, and for building aligned numeric design matrices.
+  arrays.
 }

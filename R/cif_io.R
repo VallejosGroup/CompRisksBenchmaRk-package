@@ -1,6 +1,6 @@
-#' @title CIF Array and Design Matrix Utilities
+#' @title CIF Array and Storage Utilities
 #' @description Functions for pooling, saving, and storing CIF prediction
-#'   arrays, and for building aligned numeric design matrices.
+#'   arrays.
 #' @name cif_io
 NULL
 
@@ -22,63 +22,6 @@ pool_cifs_mean <- function(cif_list) {
   pooled / m
 }
 
-
-#' Build a numeric design matrix aligned between train and new data
-#'
-#' Expands factor columns, drops zero-variance columns, enforces full
-#' column rank, and ensures `x_new` has exactly the same columns as
-#' `x_train`.
-#'
-#' @param train_df Training data frame.
-#' @param new_df   New (test/validation) data frame.
-#' @param feature_cols Character vector of feature column names.
-#'
-#' @return A list with `x_train` and `x_new`, both numeric matrices.
-#' @export
-remake_X <- function(train_df, new_df, feature_cols) {
-  tr <- train_df[, feature_cols, drop = FALSE]
-  nw <- new_df[,  feature_cols, drop = FALSE]
-
-  fcols <- names(tr)[vapply(tr, is.factor, logical(1))]
-  for (cn in fcols)
-    nw[[cn]] <- factor(nw[[cn]], levels = levels(tr[[cn]]))
-
-  tt    <- stats::terms(~ ., data = tr)
-  mf_tr <- stats::model.frame(tt, data = tr, na.action = stats::na.pass)
-  X_tr  <- stats::model.matrix(tt, data = mf_tr)[, -1, drop = FALSE]
-
-  tt    <- stats::terms(~ ., data = nw)
-  mf_nw <- stats::model.frame(tt, data = nw, na.action = stats::na.pass)
-  X_nw  <- stats::model.matrix(tt, data = mf_nw)[, -1, drop = FALSE]
-
-  colnames(X_tr) <- make.names(colnames(X_tr), unique = TRUE)
-  colnames(X_nw) <- make.names(colnames(X_nw), unique = TRUE)
-
-  miss <- setdiff(colnames(X_tr), colnames(X_nw))
-  if (length(miss))
-    X_nw <- cbind(X_nw,
-                  matrix(0, nrow(X_nw), length(miss),
-                         dimnames = list(NULL, miss)))
-  X_nw <- X_nw[, colnames(X_tr), drop = FALSE]
-
-  keep_var <- apply(X_tr, 2, function(z) stats::sd(z) > 0)
-  if (any(!keep_var)) {
-    X_tr <- X_tr[, keep_var, drop = FALSE]
-    X_nw <- X_nw[, keep_var, drop = FALSE]
-  }
-
-  if (ncol(X_tr) > 0) {
-    q   <- qr(X_tr)
-    piv <- q$pivot[seq_len(q$rank)]
-    X_tr <- X_tr[, piv, drop = FALSE]
-    X_nw <- X_nw[, colnames(X_tr), drop = FALSE]
-  }
-
-  storage.mode(X_tr) <- "double"
-  storage.mode(X_nw) <- "double"
-
-  list(x_train = X_tr, x_new = X_nw)
-}
 
 
 #' Build storage path for CIF outputs
