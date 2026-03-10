@@ -72,9 +72,9 @@
 #' also returned.
 #'
 #' @return A named list; elements present depend on the requested metrics:
-#'   `bs`, `ibs`, `auc`, `cindex_pec`, `cindex_survM`, `calib_measures`.
+#'   `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `calib_measures`.
 #'   Each element is itself a named list with one entry per cause (e.g.
-#'   `$bs$cause_1`, `$bs$cause_2`).
+#'   `$Brier$cause_1`, `$Brier$cause_2`).
 #' @export
 calculate_metrics <- function(cr, eval_times,
                               cif          = NULL,
@@ -88,53 +88,53 @@ calculate_metrics <- function(cr, eval_times,
                               se.fit       = FALSE) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
-  
+
   if (is.null(cif) && is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are NULL.",
          call. = FALSE)
   if (!is.null(cif) && !is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are non-NULL.",
          call. = FALSE)
-  
+
   if (!is.null(fit)) {
     if (is.null(cif_time_grid))
       stop("`cif_time_grid` must be provided when `fit` is non-NULL.", call. = FALSE)
     cif <- predict_cif(fit, newdata = cr, time_grid = cif_time_grid)
   }
-  
+
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
   idx_nms   <- paste0("cause_", causes)
-  
+
   d  <- dim(cif)
   n  <- d[1]; Tm <- d[3]
-  
+
   f <- stats::as.formula(
     sprintf("Hist(%s,%s) ~ 1", time_var, event_var),
     env = getNamespace("prodlim")
   )
-  
+
   comp_brier <- "brier"          %in% metrics
   comp_auc   <- "auc"            %in% metrics
   comp_pec   <- "cidx_pec"       %in% metrics
   comp_survM <- "cidx_survM"     %in% metrics
   comp_calib <- "calib_measures" %in% metrics
   comp_ibs   <- comp_brier && ("ibs" %in% summary)
-  
+
   rr_metrics <- intersect(metrics, c("brier", "auc"))
   rr_summary <- intersect(summary, c("ibs", "risks"))
-  
+
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
-  
-  bs     <- named_list(comp_brier)
-  ibs    <- named_list(comp_ibs)
-  auc    <- named_list(comp_auc)
-  pec    <- named_list(comp_pec)
-  survM  <- named_list(comp_survM)
-  calib  <- named_list(comp_calib)
-  
+
+  Brier  <- named_list(comp_brier)
+  IBS    <- named_list(comp_ibs)
+  tdAUC  <- named_list(comp_auc)
+  cindex_t_year <- named_list(comp_pec)
+  cindex_survM  <- named_list(comp_survM)
+  calib_measures <- named_list(comp_calib)
+
   for (k in causes) {
     i      <- which(causes == k)
     nm     <- idx_nms[i]
@@ -142,7 +142,7 @@ calculate_metrics <- function(cr, eval_times,
     dim(M) <- c(n, Tm)
     k_name <- paste0("cif_cause_", k)
     preds  <- stats::setNames(list(M), k_name)
-    
+
     if (length(rr_metrics) > 0) {
       sc   <- riskRegression::Score(
         object      = preds,
@@ -157,12 +157,12 @@ calculate_metrics <- function(cr, eval_times,
         se.fit      = se.fit
       )
       rows <- sc$Brier$score$model == k_name
-      if (comp_brier) bs[[nm]]  <- sc$Brier$score[rows, "Brier"]
-      if (comp_ibs)   ibs[[nm]] <- sc$Brier$score[rows, "IBS"]
-      if (comp_auc)   auc[[nm]] <- sc$AUC$score[
+      if (comp_brier) Brier[[nm]]  <- sc$Brier$score[rows, "Brier"]
+      if (comp_ibs)   IBS[[nm]] <- sc$Brier$score[rows, "IBS"]
+      if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[
         sc$AUC$score$model == k_name, "AUC"]
     }
-    
+
     if (comp_pec) {
       cidx <- pec::cindex(
         object      = preds,
@@ -175,9 +175,9 @@ calculate_metrics <- function(cr, eval_times,
         splitMethod = "noPlan",
         verbose     = FALSE
       )
-      pec[[nm]] <- cidx$AppCindex[[k_name]]
+      cindex_t_year[[nm]] <- cidx$AppCindex[[k_name]]
     }
-    
+
     if (comp_survM) {
       res <- lapply(seq_len(ncol(M)), function(j)
         CindexCR(time      = cr@data[[time_var]],
@@ -185,12 +185,12 @@ calculate_metrics <- function(cr, eval_times,
                  predicted = 1 - M[, j],
                  Cause_int = k)
       )
-      survM[[nm]] <- list(
+      cindex_survM[[nm]] <- list(
         sapply(res, `[[`, "cindex"),
         sapply(res, `[[`, "time_ev")
       )
     }
-    
+
     if (comp_calib) {
       cm <- CalibrationPlot(
         predictions      = M,
@@ -204,16 +204,16 @@ calculate_metrics <- function(cr, eval_times,
         loess_smoothing  = TRUE,
         graph            = FALSE
       )$calib.measures
-      calib[[nm]] <- do.call(rbind, Filter(Negate(is.null), cm))
+      calib_measures[[nm]] <- do.call(rbind, Filter(Negate(is.null), cm))
     }
   }
-  
+
   Filter(Negate(is.null), list(
-    bs             = bs,
-    ibs            = ibs,
-    auc            = auc,
-    cindex_pec     = pec,
-    cindex_survM   = survM,
-    calib_measures = calib
+    Brier          = Brier,
+    IBS            = IBS,
+    tdAUC          = tdAUC,
+    cindex_t_year  = cindex_t_year,
+    cindex_survM   = cindex_survM,
+    calib_measures = calib_measures
   ))
 }

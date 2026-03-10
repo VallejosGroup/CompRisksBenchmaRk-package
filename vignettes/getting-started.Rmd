@@ -236,8 +236,8 @@ scores_auc_FGRP <- calculate_metrics(
 )
 
 # IBS per cause for each model
-scores_brier_FGR$ibs
-scores_brier_FGR$bs$cause_2    # time-specific Brier score for death (FGR)
+scores_brier_FGR$IBS
+scores_brier_FGR$Brier$cause_2    # time-specific Brier score for death (FGR)
 ```
 
 For convenience, the same scoring can be obtained programmatically:
@@ -254,7 +254,7 @@ scores <- lapply(cifs, function(cif)
 )
 
 # Compare IBS for cause 2 across models
-sapply(scores, function(s) s$ibs$cause_2)
+sapply(scores, function(s) s$IBS$cause_2)
 ```
 
 ---
@@ -355,7 +355,7 @@ out <- get_results(
   sample_curves     = FALSE
 )
 
-lapply(out$res$FGR, function(f) f$ibs$cause_2)
+lapply(out$res$FGR, function(f) f$IBS$cause_2)
 ```
 
 ---

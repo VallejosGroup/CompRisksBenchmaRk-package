@@ -288,10 +288,10 @@ summarize_out_of_sample <- function(results, num_causes, times) {
         if (!is.null(x)) x else array(NA_real_, len)
 
       for (cause in seq_len(causes)) {
-        bs         <- get_or_na(res_fold$bs[[cause]],          length(times))
-        ibs        <- get_or_na(res_fold$ibs[[cause]],         length(times))
-        auc        <- get_or_na(res_fold$auc[[cause]],         length(times))
-        cidx_pec   <- get_or_na(res_fold$cindex_pec[[cause]],  length(times))
+        bs         <- get_or_na(res_fold$Brier[[cause]],          length(times))
+        ibs        <- get_or_na(res_fold$IBS[[cause]],         length(times))
+        auc        <- get_or_na(res_fold$tdAUC[[cause]],         length(times))
+        cidx_pec   <- get_or_na(res_fold$cindex_t_year[[cause]],  length(times))
         cidx_survM <- if (!is.null(res_fold$cindex_survM[[cause]]))
           res_fold$cindex_survM[[cause]]
         else

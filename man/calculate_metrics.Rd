@@ -60,9 +60,9 @@ relevant for `"brier"` and `"auc"`.}
 }
 \value{
 A named list; elements present depend on the requested metrics:
-  `bs`, `ibs`, `auc`, `cindex_pec`, `cindex_survM`, `calib_measures`.
+  `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `calib_measures`.
   Each element is itself a named list with one entry per cause (e.g.
-  `$bs$cause_1`, `$bs$cause_2`).
+  `$Brier$cause_1`, `$Brier$cause_2`).
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
