@@ -197,9 +197,9 @@ get_results <- function(data_root,
       cr_test <- cr_data(df_test, time_var = "time", event_var = "event")
 
       res[[model]][[v]] <- calculate_metrics(
-        cif        = out,
         cr         = cr_test,
         eval_times = times,
+        cif        = out,
         metrics    = c("brier", "auc", "calib_measures"),
         summary    = "ibs",
         cens.method = "ipcw",
@@ -288,16 +288,16 @@ summarize_out_of_sample <- function(results, num_causes, times) {
         if (!is.null(x)) x else array(NA_real_, len)
 
       for (cause in seq_len(causes)) {
-        bs         <- get_or_na(res_fold$cause_bs[[cause]],          length(times))
-        ibs        <- get_or_na(res_fold$cause_ibs[[cause]],         length(times))
-        auc        <- get_or_na(res_fold$cause_auc[[cause]],         length(times))
-        cidx_pec   <- get_or_na(res_fold$cause_cindex_pec[[cause]],  length(times))
-        cidx_survM <- if (!is.null(res_fold$cause_cindex_survM[[cause]]))
-          res_fold$cause_cindex_survM[[cause]]
+        bs         <- get_or_na(res_fold$bs[[cause]],          length(times))
+        ibs        <- get_or_na(res_fold$ibs[[cause]],         length(times))
+        auc        <- get_or_na(res_fold$auc[[cause]],         length(times))
+        cidx_pec   <- get_or_na(res_fold$cindex_pec[[cause]],  length(times))
+        cidx_survM <- if (!is.null(res_fold$cindex_survM[[cause]]))
+          res_fold$cindex_survM[[cause]]
         else
           list(rep(NA_real_, length(times)), rep(NA_real_, length(times)))
-        calib_meas <- if (!is.null(res_fold$cause_calib_measures[[cause]]))
-          res_fold$cause_calib_measures[[cause]]
+        calib_meas <- if (!is.null(res_fold$calib_measures[[cause]]))
+          res_fold$calib_measures[[cause]]
         else
           list(ICI = NA_real_, E50 = NA_real_, E90 = NA_real_,
                Emax = NA_real_, RSB = NA_real_)

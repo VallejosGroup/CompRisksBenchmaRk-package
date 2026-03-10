@@ -177,67 +177,67 @@ cifs <- lapply(fits, function(fit)
 ```{r scoring}
 # --- FGR ---
 scores_brier_FGR <- calculate_metrics(
-  cif     = cif_FGR,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_FGR,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_FGR <- calculate_metrics(
-  cif     = cif_FGR,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_FGR,
   metrics = "auc"
 )
 
 # --- csCPH ---
 scores_brier_csCPH <- calculate_metrics(
-  cif     = cif_csCPH,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_csCPH,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_csCPH <- calculate_metrics(
-  cif     = cif_csCPH,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_csCPH,
   metrics = "auc"
 )
 
 # --- RSF ---
 scores_brier_RSF <- calculate_metrics(
-  cif     = cif_RSF,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_RSF,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_RSF <- calculate_metrics(
-  cif     = cif_RSF,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_RSF,
   metrics = "auc"
 )
 
 # --- FGRP ---
 scores_brier_FGRP <- calculate_metrics(
-  cif     = cif_FGRP,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_FGRP,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_FGRP <- calculate_metrics(
-  cif     = cif_FGRP,
-  cr      = cr,
+  cr         = cr,
   eval_times = time_grid,
+  cif        = cif_FGRP,
   metrics = "auc"
 )
 
 # IBS per cause for each model
-scores_brier_FGR$cause_ibs
-scores_brier_FGR$cause_bs$cause_2    # time-specific Brier score for death (FGR)
+scores_brier_FGR$ibs
+scores_brier_FGR$bs$cause_2    # time-specific Brier score for death (FGR)
 ```
 
 For convenience, the same scoring can be obtained programmatically:
@@ -245,16 +245,16 @@ For convenience, the same scoring can be obtained programmatically:
 ```{r scoring-lapply, eval = FALSE}
 scores <- lapply(cifs, function(cif)
   calculate_metrics(
-    cif     = cif,
     cr      = cr,
     eval_times = time_grid,
+    cif     = cif,
       metrics = c("brier", "auc"),
     summary = "ibs"
   )
 )
 
 # Compare IBS for cause 2 across models
-sapply(scores, function(s) s$cause_ibs$cause_2)
+sapply(scores, function(s) s$ibs$cause_2)
 ```
 
 ---
@@ -355,7 +355,7 @@ out <- get_results(
   sample_curves     = FALSE
 )
 
-lapply(out$res$FGR, function(f) f$cause_ibs$cause_2)
+lapply(out$res$FGR, function(f) f$ibs$cause_2)
 ```
 
 ---

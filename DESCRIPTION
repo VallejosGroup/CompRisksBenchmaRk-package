@@ -65,6 +65,7 @@ Collate:
     'cif_io.R'
     'scoring.R'
     'metrics.R'
+    'calculate_metrics.R'
     'nested_cv.R'
     'model_FGR.R'
     'model_FGRP.R'
