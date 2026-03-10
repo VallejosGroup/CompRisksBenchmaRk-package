@@ -8,28 +8,20 @@ score_from_rmlt(
   rmlt,
   test,
   times,
-  causes,
-  time_col = "time",
-  status_col = "event",
   metrics = "cidx_pec",
   cens.method = "ipcw",
   cens.model = "km",
-  cens.code = 0L,
+  cens.code = 0,
   se.fit = FALSE
 )
 }
 \arguments{
 \item{rmlt}{2-D matrix `[n, K]` of RMLT values.}
 
-\item{test}{Data frame of outcomes.}
+\item{test}{A [cr_data()] object providing test-set outcomes, time and
+event variable names, and cause codes.}
 
 \item{times}{Numeric scalar or vector of evaluation times.}
-
-\item{causes}{Integer vector of cause codes.}
-
-\item{time_col}{Column name for times (default `"time"`).}
-
-\item{status_col}{Column name for status (default `"event"`).}
 
 \item{metrics}{Character vector; only `"cidx_pec"` is currently
 supported.}

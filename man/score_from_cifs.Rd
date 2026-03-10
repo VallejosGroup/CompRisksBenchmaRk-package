@@ -8,14 +8,11 @@ score_from_cifs(
   out,
   test,
   times,
-  causes,
-  time_col = "time",
-  status_col = "event",
   metrics = c("brier", "auc"),
   summary = c("ibs", "risks"),
   cens.method = "ipcw",
   cens.model = "km",
-  cens.code = 0L,
+  cens.code = 0,
   se.fit = FALSE
 )
 }
@@ -24,17 +21,10 @@ score_from_cifs(
 the number of subjects, `K` the number of competing causes, and `Tm` the
 number of evaluation times.}
 
-\item{test}{Data frame of test-set outcomes with at least columns
-`time_col` and `status_col`.}
+\item{test}{A [cr_data()] object providing the test-set outcomes, time and
+event variable names, and cause codes.}
 
 \item{times}{Numeric vector of evaluation times (length `Tm`).}
-
-\item{causes}{Integer vector of cause codes corresponding to the `K`
-second dimension of `out`.}
-
-\item{time_col}{Name of the time column in `test` (default `"time"`).}
-
-\item{status_col}{Name of the status column in `test` (default `"event"`).}
 
 \item{metrics}{Character vector of metrics to compute. Supported values:
 `"brier"`, `"auc"`, `"cidx_pec"`, `"cidx_survM"`, `"calib_measures"`.}

@@ -7,7 +7,7 @@
 extract_fgrp_coefs(fit_obj, tol = 1e-08)
 }
 \arguments{
-\item{fit_obj}{A `cr_model_fgrp` object returned by the FGRP `fit()`
+\item{fit_obj}{A fit object returned by the FGRP `fit()`
 function.}
 
 \item{tol}{Threshold below which absolute coefficient values are
