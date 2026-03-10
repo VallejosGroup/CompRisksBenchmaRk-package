@@ -13,19 +13,21 @@ NULL
 
 register_cr_model(
   key = "RSF",
-
+  
   fit = function(obj, args = list(), ...) {
     if (!methods::is(obj, "cr_data"))
       stop("`obj` must be a cr_data object.", call. = FALSE)
-
+    
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
-
+    
     formula <- stats::reformulate(
       obj@covars$covars_names,
       response = paste0("Surv(", obj@time_var, ", ", obj@event_var, ")")
     )
-
+    
+    if (!is.null(args$seed)) set.seed(args$seed)
+    
     fits <- randomForestSRC::rfsrc(
       formula   = formula,
       data      = obj@data,
@@ -37,21 +39,21 @@ register_cr_model(
     )
     list(causes = obj@causes, fits = fits, model_key = "RSF")
   },
-
+  
   predict_cif = function(fit_obj, newdata, time_grid) {
     if (!methods::is(newdata, "cr_data"))
       stop("`newdata` must be a cr_data object.", call. = FALSE)
     newdata <- newdata@data
-
+    
     if (!requireNamespace("randomForestSRC", quietly = TRUE))
       stop("Please install 'randomForestSRC'.")
-
+    
     n       <- nrow(newdata)
     K       <- length(fit_obj$causes)
     out     <- array(0, dim = c(n, K, length(time_grid)))
     pr      <- randomForestSRC::predict.rfsrc(fit_obj$fits, newdata = newdata)
     train_t <- pr$time.interest
-
+    
     for (k in seq_len(K)) {
       cif_mat <- as.matrix(pr$cif[, , k, drop = FALSE][,, 1])
       for (i in seq_len(n)) {
@@ -66,7 +68,7 @@ register_cr_model(
     }
     out
   },
-
+  
   info = function() list(
     name         = "Random Survival Forest (CR) \u2014 randomForestSRC::rfsrc",
     supports     = "CIF",
