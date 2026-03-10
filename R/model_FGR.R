@@ -29,8 +29,9 @@ register_cr_model(
 
     formula <- stats::reformulate(
       obj@covars$covars_names,
-      response = paste0("prodlim::Hist(", obj@time_var, ", ", obj@event_var, ")")
+      response = paste0("Hist(", obj@time_var, ", ", obj@event_var, ")")
     )
+    environment(formula) <- asNamespace("prodlim")
 
     fits <- lapply(obj@causes, function(k) {
       riskRegression::FGR(formula, data = obj@data, cause = k, ...)
