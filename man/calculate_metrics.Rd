@@ -15,7 +15,8 @@ calculate_metrics(
   cens.method = "ipcw",
   cens.model = "km",
   cens.code = 0,
-  se.fit = FALSE
+  se.fit = FALSE,
+  rmlt_tau = NULL
 )
 }
 \arguments{
@@ -39,6 +40,7 @@ is supplied; ignored when `cif` is supplied directly.}
 \item{metrics}{Character vector of metrics to compute. Supported values:
 `"brier"` (Brier score), `"auc"` (time-dependent AUC), `"cidx_pec"`
 (C-index via \pkg{pec}), `"cidx_survM"` (C-index via SurvM),
+`"cidx_rmlt"` (C-index via restricted mean lifetime),
 `"calib_measures"` (calibration summary statistics).}
 
 \item{summary}{Character vector of Brier-score summaries (relevant only
@@ -57,12 +59,16 @@ and `"auc"`.}
 
 \item{se.fit}{Logical; compute standard errors? (default `FALSE`);
 relevant for `"brier"` and `"auc"`.}
+
+\item{rmlt_tau}{Upper integration limit for the restricted mean lifetime
+(default `NULL`, which uses `max(eval_times)`); relevant only for
+`"cidx_rmlt"`.}
 }
 \value{
 A named list; elements present depend on the requested metrics:
-  `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `calib_measures`.
-  Each element is itself a named list with one entry per cause (e.g.
-  `$Brier$cause_1`, `$Brier$cause_2`).
+  `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `cindex_rmlt`,
+  `calib_measures`.  Each element is itself a named list with one entry per
+  cause (e.g. `$Brier$cause_1`, `$Brier$cause_2`).
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
@@ -96,6 +102,12 @@ cause:
   \item{`"cidx_survM"`}{A cause-specific C-index computed via an internal
     `CindexCR()` routine.  Evaluated at each time in `eval_times` and
     returned together with the corresponding evaluation time points.}
+
+  \item{`"cidx_rmlt"`}{A C-index based on the restricted mean lifetime
+    (RMLT), computed by first integrating each subject's CIF up to
+    `rmlt_tau` via trapezoidal integration, then passing the resulting
+    summary scores to `pec::cindex()`.  Useful as a scalar discrimination
+    summary that does not depend on a specific time horizon.}
 
   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
     Emax, RSB) computed via an internal `CalibrationPlot()` routine.
