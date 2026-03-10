@@ -22,6 +22,7 @@
 #' @param metrics    Character vector of metrics to compute. Supported values:
 #'   `"brier"` (Brier score), `"auc"` (time-dependent AUC), `"cidx_pec"`
 #'   (C-index via \pkg{pec}), `"cidx_survM"` (C-index via SurvM),
+#'   `"cidx_rmlt"` (C-index via restricted mean lifetime),
 #'   `"calib_measures"` (calibration summary statistics).
 #' @param summary    Character vector of Brier-score summaries (relevant only
 #'   when `"brier"` is in `metrics`): `"ibs"` for the integrated Brier score
@@ -35,6 +36,9 @@
 #'   `0`); relevant for `"calib_measures"`.
 #' @param se.fit      Logical; compute standard errors? (default `FALSE`);
 #'   relevant for `"brier"` and `"auc"`.
+#' @param rmlt_tau    Upper integration limit for the restricted mean lifetime
+#'   (default `NULL`, which uses `max(eval_times)`); relevant only for
+#'   `"cidx_rmlt"`.
 #'
 #' @details
 #' The following metrics are supported, computed separately for each competing
@@ -61,6 +65,12 @@
 #'     `CindexCR()` routine.  Evaluated at each time in `eval_times` and
 #'     returned together with the corresponding evaluation time points.}
 #'
+#'   \item{`"cidx_rmlt"`}{A C-index based on the restricted mean lifetime
+#'     (RMLT), computed by first integrating each subject's CIF up to
+#'     `rmlt_tau` via trapezoidal integration, then passing the resulting
+#'     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
+#'     summary that does not depend on a specific time horizon.}
+#'
 #'   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
 #'     Emax, RSB) computed via an internal `CalibrationPlot()` routine.
 #'     These quantify agreement between predicted CIF values and observed
@@ -72,9 +82,9 @@
 #' also returned.
 #'
 #' @return A named list; elements present depend on the requested metrics:
-#'   `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `calib_measures`.
-#'   Each element is itself a named list with one entry per cause (e.g.
-#'   `$Brier$cause_1`, `$Brier$cause_2`).
+#'   `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `cindex_rmlt`,
+#'   `calib_measures`.  Each element is itself a named list with one entry per
+#'   cause (e.g. `$Brier$cause_1`, `$Brier$cause_2`).
 #' @export
 calculate_metrics <- function(cr, eval_times,
                               cif          = NULL,
@@ -85,7 +95,8 @@ calculate_metrics <- function(cr, eval_times,
                               cens.method  = "ipcw",
                               cens.model   = "km",
                               cens.code    = 0,
-                              se.fit       = FALSE) {
+                              se.fit       = FALSE,
+                              rmlt_tau     = NULL) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
 
@@ -119,6 +130,7 @@ calculate_metrics <- function(cr, eval_times,
   comp_auc   <- "auc"            %in% metrics
   comp_pec   <- "cidx_pec"       %in% metrics
   comp_survM <- "cidx_survM"     %in% metrics
+  comp_rmlt  <- "cidx_rmlt"      %in% metrics
   comp_calib <- "calib_measures" %in% metrics
   comp_ibs   <- comp_brier && ("ibs" %in% summary)
 
@@ -128,12 +140,18 @@ calculate_metrics <- function(cr, eval_times,
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
 
-  Brier  <- named_list(comp_brier)
-  IBS    <- named_list(comp_ibs)
-  tdAUC  <- named_list(comp_auc)
-  cindex_t_year <- named_list(comp_pec)
-  cindex_survM  <- named_list(comp_survM)
+  Brier          <- named_list(comp_brier)
+  IBS            <- named_list(comp_ibs)
+  tdAUC          <- named_list(comp_auc)
+  cindex_t_year  <- named_list(comp_pec)
+  cindex_survM   <- named_list(comp_survM)
+  cindex_rmlt    <- named_list(comp_rmlt)
   calib_measures <- named_list(comp_calib)
+
+  if (comp_rmlt) {
+    tau  <- if (!is.null(rmlt_tau)) rmlt_tau else max(eval_times)
+    rmlt <- compute_rmlt_from_cif(cif, eval_times, tau = tau)
+  }
 
   for (k in causes) {
     i      <- which(causes == k)
@@ -191,6 +209,23 @@ calculate_metrics <- function(cr, eval_times,
       )
     }
 
+    if (comp_rmlt) {
+      k_name_rmlt <- paste0("cause_", k)
+      pred_mat    <- as.matrix(rmlt[, i])
+      colnames(pred_mat) <- paste0("times_", max(eval_times))
+      preds_rmlt  <- stats::setNames(list(pred_mat), k_name_rmlt)
+      cidx_rmlt   <- pec::cindex(
+        object      = preds_rmlt,
+        formula     = f,
+        data        = cr@data,
+        eval.times  = max(eval_times),
+        cens.model  = "marginal",
+        splitMethod = "noPlan",
+        verbose     = FALSE
+      )
+      cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[k_name_rmlt]]
+    }
+
     if (comp_calib) {
       cm <- CalibrationPlot(
         predictions      = M,
@@ -214,6 +249,7 @@ calculate_metrics <- function(cr, eval_times,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
     cindex_survM   = cindex_survM,
+    cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures
   ))
 }

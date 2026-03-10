@@ -211,11 +211,11 @@ get_results <- function(data_root,
 
       all_rmlt[[model]][[v]] <- compute_rmlt_from_cif(out, times,
                                                       tau = max(times))
-      res_rmlt[[model]][[v]] <- score_from_rmlt(
-        rmlt       = all_rmlt[[model]][[v]],
-        test       = cr_test,
-        times      = max(times),
-        metrics    = "cidx_pec"
+      res_rmlt[[model]][[v]] <- calculate_metrics(
+        cr         = cr_test,
+        eval_times = max(times),
+        cif        = out,
+        metrics    = "cidx_rmlt"
       )
     }
 
