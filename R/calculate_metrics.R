@@ -36,6 +36,41 @@
 #' @param se.fit      Logical; compute standard errors? (default `FALSE`);
 #'   relevant for `"brier"` and `"auc"`.
 #'
+#' @details
+#' The following metrics are supported, computed separately for each competing
+#' cause:
+#'
+#' \describe{
+#'   \item{`"brier"`}{The time-dependent Brier score, an IPCW-weighted mean
+#'     squared error between predicted CIF values and event indicators at each
+#'     evaluation time.  Lower values indicate better calibration and
+#'     discrimination.  Computed via `riskRegression::Score()`.}
+#'
+#'   \item{`"auc"`}{The time-dependent cause-specific AUC, measuring the
+#'     probability that a randomly chosen case has a higher predicted CIF than
+#'     a randomly chosen control at each evaluation time.  Values above 0.5
+#'     indicate discrimination better than chance.  Computed via
+#'     `riskRegression::Score()`.}
+#'
+#'   \item{`"cidx_pec"`}{The concordance index (C-index) computed via
+#'     `pec::cindex()` using a marginal censoring model.  Summarises
+#'     discrimination across the entire follow-up rather than at a specific
+#'     time point.}
+#'
+#'   \item{`"cidx_survM"`}{A cause-specific C-index computed via an internal
+#'     `CindexCR()` routine.  Evaluated at each time in `eval_times` and
+#'     returned together with the corresponding evaluation time points.}
+#'
+#'   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
+#'     Emax, RSB) computed via an internal `CalibrationPlot()` routine.
+#'     These quantify agreement between predicted CIF values and observed
+#'     event fractions at each evaluation time.}
+#' }
+#'
+#' When `"brier"` is requested, the `summary` argument controls whether the
+#' integrated Brier score (`"ibs"`) and/or per-risk summaries (`"risks"`) are
+#' also returned.
+#'
 #' @return A named list; elements present depend on the requested metrics:
 #'   `bs`, `ibs`, `auc`, `cindex_pec`, `cindex_survM`, `calib_measures`.
 #'   Each element is itself a named list with one entry per cause (e.g.
