@@ -200,8 +200,8 @@ get_results <- function(data_root,
         cr         = cr_test,
         eval_times = times,
         cif        = out,
-        metrics    = c("brier", "auc", "calib_measures"),
-        summary    = "ibs",
+        metrics    = c("Brier", "tdAUC", "calib_measures"),
+        summary    = "IBS",
         cens.method = "ipcw",
         cens.model  = "km"
       )
@@ -215,7 +215,7 @@ get_results <- function(data_root,
         cr         = cr_test,
         eval_times = max(times),
         cif        = out,
-        metrics    = "cidx_rmlt"
+        metrics    = "cindex_rmlt"
       )
     }
 

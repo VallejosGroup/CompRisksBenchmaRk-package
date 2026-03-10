@@ -180,14 +180,14 @@ scores_brier_FGR <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGR,
-  metrics = "brier",
-  summary = "ibs"
+  metrics = "Brier",
+  summary = "IBS"
 )
 scores_auc_FGR <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGR,
-  metrics = "auc"
+  metrics = "tdAUC"
 )
 
 # --- csCPH ---
@@ -195,14 +195,14 @@ scores_brier_csCPH <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_csCPH,
-  metrics = "brier",
-  summary = "ibs"
+  metrics = "Brier",
+  summary = "IBS"
 )
 scores_auc_csCPH <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_csCPH,
-  metrics = "auc"
+  metrics = "tdAUC"
 )
 
 # --- RSF ---
@@ -210,14 +210,14 @@ scores_brier_RSF <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_RSF,
-  metrics = "brier",
-  summary = "ibs"
+  metrics = "Brier",
+  summary = "IBS"
 )
 scores_auc_RSF <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_RSF,
-  metrics = "auc"
+  metrics = "tdAUC"
 )
 
 # --- FGRP ---
@@ -225,14 +225,14 @@ scores_brier_FGRP <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGRP,
-  metrics = "brier",
-  summary = "ibs"
+  metrics = "Brier",
+  summary = "IBS"
 )
 scores_auc_FGRP <- calculate_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGRP,
-  metrics = "auc"
+  metrics = "tdAUC"
 )
 
 # IBS per cause for each model
@@ -248,8 +248,8 @@ scores <- lapply(cifs, function(cif)
     cr      = cr,
     eval_times = time_grid,
     cif     = cif,
-      metrics = c("brier", "auc"),
-    summary = "ibs"
+      metrics = c("Brier", "tdAUC"),
+    summary = "IBS"
   )
 )
 

@@ -20,18 +20,19 @@
 #'   when `fit` is non-`NULL` (default `NULL`).  Must be provided when `fit`
 #'   is supplied; ignored when `cif` is supplied directly.
 #' @param metrics    Character vector of metrics to compute. Supported values:
-#'   `"brier"` (Brier score), `"auc"` (time-dependent AUC), `"cidx_pec"`
-#'   (C-index via \pkg{pec}), `"cidx_survM"` (C-index via SurvM),
-#'   `"cidx_rmlt"` (C-index via restricted mean lifetime),
+#'   `"Brier"` (Brier score), `"tdAUC"` (time-dependent AUC),
+#'   `"cindex_t_year"` (C-index via \pkg{pec}),
+#'   `"cindex_survM"` (C-index via SurvM),
+#'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
 #'   `"calib_measures"` (calibration summary statistics).
 #' @param summary    Character vector of Brier-score summaries (relevant only
-#'   when `"brier"` is in `metrics`): `"ibs"` for the integrated Brier score
+#'   when `"Brier"` is in `metrics`): `"IBS"` for the integrated Brier score
 #'   and/or `"risks"` for per-risk summaries.
 #' @param cens.method Censoring correction method passed to
-#'   `riskRegression::Score()` (default `"ipcw"`); relevant for `"brier"`
-#'   and `"auc"`.
+#'   `riskRegression::Score()` (default `"ipcw"`); relevant for `"Brier"`
+#'   and `"tdAUC"`.
 #' @param cens.model  Censoring model used for IPCW weighting (default
-#'   `"km"`); relevant for `"brier"` and `"auc"`.
+#'   `"km"`); relevant for `"Brier"` and `"tdAUC"`.
 #' @param cens.code   Integer code denoting censored observations (default
 #'   `0`); relevant for `"calib_measures"`.
 #' @param se.fit      Logical; compute standard errors? (default `FALSE`);
@@ -45,27 +46,27 @@
 #' cause:
 #'
 #' \describe{
-#'   \item{`"brier"`}{The time-dependent Brier score, an IPCW-weighted mean
+#'   \item{`"Brier"`}{The time-dependent Brier score, an IPCW-weighted mean
 #'     squared error between predicted CIF values and event indicators at each
 #'     evaluation time.  Lower values indicate better calibration and
 #'     discrimination.  Computed via `riskRegression::Score()`.}
 #'
-#'   \item{`"auc"`}{The time-dependent cause-specific AUC, measuring the
+#'   \item{`"tdAUC"`}{The time-dependent cause-specific AUC, measuring the
 #'     probability that a randomly chosen case has a higher predicted CIF than
 #'     a randomly chosen control at each evaluation time.  Values above 0.5
 #'     indicate discrimination better than chance.  Computed via
 #'     `riskRegression::Score()`.}
 #'
-#'   \item{`"cidx_pec"`}{The concordance index (C-index) computed via
+#'   \item{`"cindex_t_year"`}{The concordance index (C-index) computed via
 #'     `pec::cindex()` using a marginal censoring model.  Summarises
 #'     discrimination across the entire follow-up rather than at a specific
 #'     time point.}
 #'
-#'   \item{`"cidx_survM"`}{A cause-specific C-index computed via an internal
+#'   \item{`"cindex_survM"`}{A cause-specific C-index computed via an internal
 #'     `CindexCR()` routine.  Evaluated at each time in `eval_times` and
 #'     returned together with the corresponding evaluation time points.}
 #'
-#'   \item{`"cidx_rmlt"`}{A C-index based on the restricted mean lifetime
+#'   \item{`"cindex_rmlt"`}{A C-index based on the restricted mean lifetime
 #'     (RMLT), computed by first integrating each subject's CIF up to
 #'     `rmlt_tau` via trapezoidal integration, then passing the resulting
 #'     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
@@ -77,8 +78,8 @@
 #'     event fractions at each evaluation time.}
 #' }
 #'
-#' When `"brier"` is requested, the `summary` argument controls whether the
-#' integrated Brier score (`"ibs"`) and/or per-risk summaries (`"risks"`) are
+#' When `"Brier"` is requested, the `summary` argument controls whether the
+#' integrated Brier score (`"IBS"`) and/or per-risk summaries (`"risks"`) are
 #' also returned.
 #'
 #' @return A named list; elements present depend on the requested metrics:
@@ -90,8 +91,8 @@ calculate_metrics <- function(cr, eval_times,
                               cif          = NULL,
                               fit          = NULL,
                               cif_time_grid = NULL,
-                              metrics      = c("brier", "auc"),
-                              summary      = c("ibs", "risks"),
+                              metrics      = c("Brier", "tdAUC"),
+                              summary      = c("IBS", "risks"),
                               cens.method  = "ipcw",
                               cens.model   = "km",
                               cens.code    = 0,
@@ -121,21 +122,22 @@ calculate_metrics <- function(cr, eval_times,
   d  <- dim(cif)
   n  <- d[1]; Tm <- d[3]
 
-  f <- stats::as.formula(
-    sprintf("Hist(%s,%s) ~ 1", time_var, event_var),
-    env = getNamespace("prodlim")
-  )
+  f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
+  environment(f) <- asNamespace("prodlim")
 
-  comp_brier <- "brier"          %in% metrics
-  comp_auc   <- "auc"            %in% metrics
-  comp_pec   <- "cidx_pec"       %in% metrics
-  comp_survM <- "cidx_survM"     %in% metrics
-  comp_rmlt  <- "cidx_rmlt"      %in% metrics
+  comp_brier <- "Brier"          %in% metrics
+  comp_auc   <- "tdAUC"          %in% metrics
+  comp_pec   <- "cindex_t_year"  %in% metrics
+  comp_survM <- "cindex_survM"   %in% metrics
+  comp_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
-  comp_ibs   <- comp_brier && ("ibs" %in% summary)
+  comp_ibs   <- comp_brier && ("IBS" %in% summary)
 
-  rr_metrics <- intersect(metrics, c("brier", "auc"))
-  rr_summary <- intersect(summary, c("ibs", "risks"))
+  # Translate to riskRegression::Score() expected values
+  rr_metrics <- c("Brier" = "brier", "tdAUC" = "auc")
+  rr_summary <- c("IBS" = "ibs", "risks" = "risks")
+  rr_metrics <- unname(rr_metrics[intersect(metrics, names(rr_metrics))])
+  rr_summary <- unname(rr_summary[intersect(summary, names(rr_summary))])
 
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
