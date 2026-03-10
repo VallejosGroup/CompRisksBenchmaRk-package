@@ -177,60 +177,60 @@ cifs <- lapply(fits, function(fit)
 ```{r scoring}
 # --- FGR ---
 scores_brier_FGR <- score_from_cifs(
-  out     = cif_FGR,
-  test    = cr,
+  cif     = cif_FGR,
+  cr      = cr,
   times   = time_grid,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_FGR <- score_from_cifs(
-  out     = cif_FGR,
-  test    = cr,
+  cif     = cif_FGR,
+  cr      = cr,
   times   = time_grid,
   metrics = "auc"
 )
 
 # --- csCPH ---
 scores_brier_csCPH <- score_from_cifs(
-  out     = cif_csCPH,
-  test    = cr,
+  cif     = cif_csCPH,
+  cr      = cr,
   times   = time_grid,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_csCPH <- score_from_cifs(
-  out     = cif_csCPH,
-  test    = cr,
+  cif     = cif_csCPH,
+  cr      = cr,
   times   = time_grid,
   metrics = "auc"
 )
 
 # --- RSF ---
 scores_brier_RSF <- score_from_cifs(
-  out     = cif_RSF,
-  test    = cr,
+  cif     = cif_RSF,
+  cr      = cr,
   times   = time_grid,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_RSF <- score_from_cifs(
-  out     = cif_RSF,
-  test    = cr,
+  cif     = cif_RSF,
+  cr      = cr,
   times   = time_grid,
   metrics = "auc"
 )
 
 # --- FGRP ---
 scores_brier_FGRP <- score_from_cifs(
-  out     = cif_FGRP,
-  test    = cr,
+  cif     = cif_FGRP,
+  cr      = cr,
   times   = time_grid,
   metrics = "brier",
   summary = "ibs"
 )
 scores_auc_FGRP <- score_from_cifs(
-  out     = cif_FGRP,
-  test    = cr,
+  cif     = cif_FGRP,
+  cr      = cr,
   times   = time_grid,
   metrics = "auc"
 )
@@ -245,8 +245,8 @@ For convenience, the same scoring can be obtained programmatically:
 ```{r scoring-lapply, eval = FALSE}
 scores <- lapply(cifs, function(cif)
   score_from_cifs(
-    out     = cif,
-    test    = cr,
+    cif     = cif,
+    cr      = cr,
     times   = time_grid,
       metrics = c("brier", "auc"),
     summary = "ibs"

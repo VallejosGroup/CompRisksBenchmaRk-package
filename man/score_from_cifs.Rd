@@ -5,8 +5,8 @@
 \title{Compute scores from a CIF prediction array}
 \usage{
 score_from_cifs(
-  out,
-  test,
+  cif,
+  cr,
   times,
   metrics = c("brier", "auc"),
   summary = c("ibs", "risks"),
@@ -17,11 +17,11 @@ score_from_cifs(
 )
 }
 \arguments{
-\item{out}{3-D numeric array with dimensions `[n, K, Tm]`, where `n` is
+\item{cif}{3-D numeric array with dimensions `[n, K, Tm]`, where `n` is
 the number of subjects, `K` the number of competing causes, and `Tm` the
 number of evaluation times.}
 
-\item{test}{A [cr_data()] object providing the test-set outcomes, time and
+\item{cr}{A [cr_data()] object providing the test-set outcomes, time and
 event variable names, and cause codes.}
 
 \item{times}{Numeric vector of evaluation times (length `Tm`).}

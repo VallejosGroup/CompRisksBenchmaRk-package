@@ -11,10 +11,10 @@ NULL
 #' routines to compute one or more performance metrics from a 3-D array of
 #' CIF predictions.
 #'
-#' @param out 3-D numeric array with dimensions `[n, K, Tm]`, where `n` is
+#' @param cif 3-D numeric array with dimensions `[n, K, Tm]`, where `n` is
 #'   the number of subjects, `K` the number of competing causes, and `Tm` the
 #'   number of evaluation times.
-#' @param test A [cr_data()] object providing the test-set outcomes, time and
+#' @param cr A [cr_data()] object providing the test-set outcomes, time and
 #'   event variable names, and cause codes.
 #' @param times Numeric vector of evaluation times (length `Tm`).
 #' @param metrics Character vector of metrics to compute. Supported values:
@@ -31,26 +31,26 @@ NULL
 #'   `cause_bs`, `cause_ibs`, `cause_auc`, `cause_cindex_pec`,
 #'   `cause_cindex_survM`, `cause_calib_measures`.
 #' @export
-score_from_cifs <- function(out, test, times,
+score_from_cifs <- function(cif, cr, times,
                              metrics      = c("brier", "auc"),
                              summary      = c("ibs", "risks"),
                              cens.method  = "ipcw",
                              cens.model   = "km",
                              cens.code    = 0,
                              se.fit       = FALSE) {
-  if (!methods::is(test, "cr_data"))
-    stop("`test` must be a cr_data object.", call. = FALSE)
+  if (!methods::is(cr, "cr_data"))
+    stop("`cr` must be a cr_data object.", call. = FALSE)
 
-  test_data  <- test@data
-  time_col   <- test@time_var
-  status_col <- test@event_var
-  causes     <- test@causes
+  cr_df    <- cr@data
+  time_var <- cr@time_var
+  event_var <- cr@event_var
+  causes   <- cr@causes
 
-  d  <- dim(out)
-  n  <- d[1L]; K <- d[2L]; Tm <- d[3L]
+  d  <- dim(cif)
+  n  <- d[1]; K <- d[2]; Tm <- d[3]
 
   f <- stats::as.formula(
-    sprintf("prodlim::Hist(%s,%s) ~ 1", time_col, status_col)
+    sprintf("prodlim::Hist(%s,%s) ~ 1", time_var, event_var)
   )
 
   comp_brier  <- "brier"          %in% metrics
@@ -78,11 +78,11 @@ score_from_cifs <- function(out, test, times,
 
   rr_metrics <- intersect(metrics, c("brier", "auc"))
   rr_summary <- intersect(summary, c("ibs",   "risks"))
-  use_Score  <- length(rr_metrics) > 0L
+  use_Score  <- length(rr_metrics) > 0
 
   for (i in seq_along(causes)) {
     k      <- causes[i]
-    M      <- out[, k, , drop = FALSE]
+    M      <- cif[, k, , drop = FALSE]
     dim(M) <- c(n, Tm)
     k_name <- paste0("cif_cause_", k)
     preds  <- stats::setNames(list(M), k_name)
@@ -91,7 +91,7 @@ score_from_cifs <- function(out, test, times,
       sc <- riskRegression::Score(
         object      = preds,
         formula     = f,
-        data        = test_data,
+        data        = cr_df,
         metrics     = rr_metrics,
         summary     = rr_summary,
         times       = times,
@@ -115,7 +115,7 @@ score_from_cifs <- function(out, test, times,
       cidx_pec <- pec::cindex(
         object      = preds,
         formula     = f,
-        data        = test_data,
+        data        = cr_df,
         eval.times  = times,
         pred.times  = times,
         cause       = k,
@@ -129,8 +129,8 @@ score_from_cifs <- function(out, test, times,
     if (comp_survM) {
       cif_mat <- preds[[k_name]]
       cidx_survM <- lapply(seq_len(ncol(cif_mat)), function(j) {
-        CindexCR(time      = test_data[[time_col]],
-                 status    = test_data[[status_col]],
+        CindexCR(time      = cr_df[[time_var]],
+                 status    = cr_df[[event_var]],
                  predicted = 1 - cif_mat[, j],
                  Cause_int = k)
       })
@@ -143,9 +143,9 @@ score_from_cifs <- function(out, test, times,
     if (comp_calib) {
       cm <- CalibrationPlot(
         predictions      = preds[[k_name]],
-        data             = test_data,
-        time             = test_data[[time_col]],
-        status           = test_data[[status_col]],
+        data             = cr_df,
+        time             = cr_df[[time_var]],
+        status           = cr_df[[event_var]],
         tau              = times,
         cause            = k,
         cens.code        = cens.code,
