@@ -11,13 +11,11 @@ compute_metrics(
   fit = NULL,
   cif_time_grid = NULL,
   metrics = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
-  cens_method_rr = "ipcw",
-  cens_model_rr = "km",
-  se_fit_rr = FALSE,
   tau = NULL,
-  maxT_rmlt = NULL,
-  collapse_as_df = TRUE,
-  ...
+  args_riskRegression = list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
+  args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
+  args_rmlt = list(maxT = NULL),
+  collapse_as_df = TRUE
 )
 }
 \arguments{
@@ -47,29 +45,30 @@ is supplied; ignored when `cif` is supplied directly.}
 `"calib_measures"` (calibration summary statistics).
 Note: requesting `"IBS"` implicitly also computes `"Brier"`.}
 
-\item{cens_method_rr}{Censoring correction method passed to
-`riskRegression::Score()` (default `"ipcw"`); relevant for `"Brier"`,
-`"IBS"`, and `"tdAUC"`.}
-
-\item{cens_model_rr}{Censoring model used for IPCW weighting (default
-`"km"`); relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.}
-
-\item{se_fit_rr}{Logical; compute standard errors? (default `FALSE`);
-relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.}
-
 \item{tau}{Numeric scalar passed as `eval.times` to `pec::cindex()`
 for `"cindex_t_year"` and `"cindex_rmlt"`.  Defaults to the maximum
 observed event time in `cr` when either of those metrics is requested.
-A warning is issued when the default is used, as IPCW weights become
+A message is issued when the default is used, as IPCW weights become
 unstable near the end of follow-up; supplying a lower value is
 recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
 is in `metrics`.}
 
-\item{maxT_rmlt}{Numeric scalar passed as `maxT` to [compute_rmlt()] when
-`"cindex_rmlt"` is in `metrics`.  Controls the upper integration limit for
-the restricted mean lifetime.  Defaults to the maximum observed event time
-in `cr` (see [compute_rmlt()]).  Ignored when `"cindex_rmlt"` is not
-requested.}
+\item{args_riskRegression}{A named list of additional arguments passed to
+`riskRegression::Score()`. Relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
+Defaults: `list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE)`.
+Any element supplied here overrides the corresponding default.}
+
+\item{args_pec}{A named list of additional arguments passed to
+`pec::cindex()`. Relevant for `"cindex_t_year"` and `"cindex_rmlt"`.
+Defaults: `list(cens.model = "marginal", splitMethod = "noPlan",
+verbose = FALSE)`. Any element supplied here overrides the corresponding
+default.}
+
+\item{args_rmlt}{A named list of additional arguments passed to
+[compute_rmlt()]. Relevant for `"cindex_rmlt"`. Defaults:
+`list(maxT = NULL)` (resolved to maximum observed event time inside
+[compute_rmlt()]). Any element supplied here overrides the corresponding
+default.}
 
 \item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
 the output list is collapsed into a data frame with one row per cause.  For time-varying metrics (`"Brier"`, `"tdAUC"`,
@@ -77,13 +76,6 @@ the output list is collapsed into a data frame with one row per cause.  For time
 metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
 For `"calib_measures"`, columns are the calibration statistics, with one
 row per cause per evaluation time and an additional `time` column.}
-
-\item{...}{Additional arguments passed to both `pec::cindex()` and
-`riskRegression::Score()`. Use with care: both functions receive the same
-`...`, so passing an argument whose name exists in one but not the other
-(or with different meanings) may cause errors or silently alter behaviour.
-When in doubt, prefer the dedicated parameters (`cens_method_rr`,
-`cens_model_rr`, `se_fit_rr`, `tau`) over `...`.}
 }
 \value{
 When `collapse_as_df = TRUE` (default), each metric element is a
@@ -127,7 +119,7 @@ cause:
 
   \item{`"cindex_rmlt"`}{A C-index based on the restricted mean lifetime
     (RMLT), computed by first integrating each subject's CIF up to
-    `tau` via trapezoidal integration, then passing the resulting
+    `args_rmlt$maxT` via trapezoidal integration, then passing the resulting
     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
     summary that does not depend on a specific time horizon.}
 
