@@ -5,42 +5,39 @@
 \title{Calibration plot for competing risks}
 \usage{
 CalibrationPlot(
-  model_name = NULL,
-  predictions,
-  data,
-  time,
-  status,
+  cr,
+  cif = NULL,
+  fit = NULL,
+  cif_time_grid = NULL,
   tau,
-  cause = 1L,
-  cens.code = 0L,
+  cause,
   loess_smoothing = TRUE,
-  predictions.type = "CIF",
   bandwidth = NULL,
   graph = TRUE
 )
 }
 \arguments{
-\item{model_name}{Optional string label for plot titles.}
+\item{cr}{A [cr_data()] object providing outcomes and metadata.}
 
-\item{predictions}{Numeric vector or matrix of predicted CIF (or
-survival) values.  If a matrix, one column per time point in `tau`.}
+\item{cif}{A list as returned by [predict_cif()], with elements
+`$cif` (3-D numeric array `[n, K, Tm]`), `$time_grid` (numeric vector),
+and optionally `$model_key` (used for plot titles).
+Mutually exclusive with `fit`.}
 
-\item{data}{Data frame with outcome columns.}
+\item{fit}{A fitted model object as returned by [fit_cr_model()].
+When supplied, the CIF is computed via [predict_cif()] before plotting.
+Mutually exclusive with `cif`.}
 
-\item{time}{Numeric vector of observed times.}
-
-\item{status}{Integer vector of event codes.}
+\item{cif_time_grid}{Numeric vector of time points passed to [predict_cif()]
+when `fit` is non-`NULL`. Must be `NULL` when `cif` is supplied directly.}
 
 \item{tau}{Numeric scalar or vector of evaluation times.}
 
-\item{cause}{Integer cause of interest (default 1).}
-
-\item{cens.code}{Censoring indicator value (default 0).}
+\item{cause}{Integer cause code of interest (must be in
+`cr@causes`).}
 
 \item{loess_smoothing}{If `TRUE` (default), use LOESS smoothing;
 otherwise use `prodlim::meanNeighbors()`.}
-
-\item{predictions.type}{`"CIF"` or `"survival"` (default `"CIF"`).}
 
 \item{bandwidth}{Optional bandwidth for nearest-neighbour smoothing.}
 

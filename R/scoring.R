@@ -182,18 +182,18 @@ get_results <- function(data_root,
     horizon_idx <- which.min(abs(times - horizon))
     horizon_use <- times[horizon_idx]
 
+    cr_all    <- cr_data(all_test_folds, time_var = "time", event_var = "event")
+    cif_all   <- list(cif       = all_cifs[[model]],
+                      time_grid = times,
+                      model_key = model)
+
     plotFrame <- CalibrationPlot(
-      model_name       = model,
-      predictions      = cause1[, horizon_idx],
-      data             = all_test_folds,
-      time             = all_test_folds$time,
-      status           = all_test_folds$event,
-      tau              = horizon_use,
-      cause            = cause_of_interest,
-      cens.code        = 0,
-      loess_smoothing  = TRUE,
-      predictions.type = "CIF",
-      graph            = TRUE
+      cr              = cr_all,
+      cif             = cif_all,
+      tau             = horizon_use,
+      cause           = cause_of_interest,
+      loess_smoothing = TRUE,
+      graph           = TRUE
     )
     print(plotFrame$graphs)
 

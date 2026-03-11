@@ -59,8 +59,8 @@ NULL
 #' @param cif A list as returned by [predict_cif()].
 #' @param cr  A `cr_data` object.
 #'
-#' @return A list with elements `cif` (3-D array) and `time_grid` (numeric
-#'   vector).
+#' @return A list with elements `cif` (3-D array), `time_grid` (numeric
+#'   vector), and `model_key` (character, `NULL` if not present in input).
 #' @noRd
 .validate_and_unpack_cif <- function(cif, cr) {
   if (!is.list(cif) || !all(c("cif", "time_grid") %in% names(cif)))
@@ -75,7 +75,7 @@ NULL
       "`cif` has %d cause dimension(s) but `cr` contains %d cause(s) (%s).",
       dim(cif$cif)[2], length(cr@causes), paste(cr@causes, collapse = ", ")
     ), call. = FALSE)
-  list(cif = cif$cif, time_grid = cif$time_grid)
+  list(cif = cif$cif, time_grid = cif$time_grid, model_key = cif$model_key)
 }
 
 

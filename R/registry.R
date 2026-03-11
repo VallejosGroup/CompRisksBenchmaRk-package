@@ -98,6 +98,8 @@ get_cr_model <- function(key) {
 #'   \describe{
 #'     \item{`cif`}{A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.}
 #'     \item{`time_grid`}{The numeric vector of evaluation times used.}
+#'     \item{`model_key`}{The character key of the model that produced the
+#'       predictions, taken from `fit_obj$model_key`.}
 #'   }
 #' @export
 #'
@@ -107,6 +109,7 @@ get_cr_model <- function(key) {
 #' result <- predict_cif(fit, newdata = cr, time_grid = time_grid)
 #' result$cif       # [n, K, Tm] array
 #' result$time_grid # evaluation times
+#' result$model_key # "FGR"
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {
   if (!methods::is(newdata, "cr_data"))
@@ -115,7 +118,8 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
   time_grid <- as.numeric(time_grid)
   list(
     cif       = mdl$predict_cif(fit_obj, newdata, time_grid),
-    time_grid = time_grid
+    time_grid = time_grid,
+    model_key = fit_obj$model_key
   )
 }
 

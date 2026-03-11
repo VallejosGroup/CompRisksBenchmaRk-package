@@ -18,6 +18,8 @@ A named list with elements:
   \describe{
     \item{`cif`}{A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.}
     \item{`time_grid`}{The numeric vector of evaluation times used.}
+    \item{`model_key`}{The character key of the model that produced the
+      predictions, taken from `fit_obj$model_key`.}
   }
 }
 \description{
@@ -32,5 +34,6 @@ fit    <- fit_cr_model("FGR", cr)
 result <- predict_cif(fit, newdata = cr, time_grid = time_grid)
 result$cif       # [n, K, Tm] array
 result$time_grid # evaluation times
+result$model_key # "FGR"
 }
 }
