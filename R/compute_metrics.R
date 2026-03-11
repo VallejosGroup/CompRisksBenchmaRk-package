@@ -180,6 +180,7 @@ compute_metrics <- function(cr, eval_times,
   cindex_t_year  <- named_list(comp_cidx_t)
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
+  rmlt           <- NULL
   if (comp_cidx_rmlt) {
     rmlt <- compute_rmlt_from_cif(cif, eval_times, tau = tau)
   }
@@ -268,7 +269,7 @@ compute_metrics <- function(cr, eval_times,
     cindex_t_year  = cindex_t_year,
     cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures,
-    rmlt           = if (comp_cidx_rmlt) rmlt else NULL
+    rmlt           = rmlt
   ))
   
   if (!collapse_as_df) return(result)
