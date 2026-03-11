@@ -176,14 +176,13 @@ cifs <- lapply(fits, function(fit)
 
 ```{r scoring}
 # --- FGR ---
-scores_brier_FGR <- calculate_metrics(
+scores_brier_FGR <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGR,
-  metrics = "Brier",
-  summary = "IBS"
+  metrics = c("Brier", "IBS")
 )
-scores_auc_FGR <- calculate_metrics(
+scores_auc_FGR <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGR,
@@ -191,14 +190,13 @@ scores_auc_FGR <- calculate_metrics(
 )
 
 # --- csCPH ---
-scores_brier_csCPH <- calculate_metrics(
+scores_brier_csCPH <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_csCPH,
-  metrics = "Brier",
-  summary = "IBS"
+  metrics = c("Brier", "IBS")
 )
-scores_auc_csCPH <- calculate_metrics(
+scores_auc_csCPH <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_csCPH,
@@ -206,14 +204,13 @@ scores_auc_csCPH <- calculate_metrics(
 )
 
 # --- RSF ---
-scores_brier_RSF <- calculate_metrics(
+scores_brier_RSF <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_RSF,
-  metrics = "Brier",
-  summary = "IBS"
+  metrics = c("Brier", "IBS")
 )
-scores_auc_RSF <- calculate_metrics(
+scores_auc_RSF <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_RSF,
@@ -221,14 +218,13 @@ scores_auc_RSF <- calculate_metrics(
 )
 
 # --- FGRP ---
-scores_brier_FGRP <- calculate_metrics(
+scores_brier_FGRP <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGRP,
-  metrics = "Brier",
-  summary = "IBS"
+  metrics = c("Brier", "IBS")
 )
-scores_auc_FGRP <- calculate_metrics(
+scores_auc_FGRP <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGRP,
@@ -244,12 +240,11 @@ For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
 scores <- lapply(cifs, function(cif)
-  calculate_metrics(
+  compute_metrics(
     cr      = cr,
     eval_times = time_grid,
     cif     = cif,
-      metrics = c("Brier", "tdAUC"),
-    summary = "IBS"
+      metrics = c("Brier", "IBS", "tdAUC")
   )
 )
 

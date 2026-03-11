@@ -20,26 +20,26 @@
 #'   when `fit` is non-`NULL` (default `NULL`).  Must be provided when `fit`
 #'   is supplied; ignored when `cif` is supplied directly.
 #' @param metrics    Character vector of metrics to compute. Supported values:
-#'   `"Brier"` (Brier score), `"tdAUC"` (time-dependent AUC),
+#'   `"Brier"` (time-dependent Brier score),
+#'   `"IBS"` (integrated Brier score),
+#'   `"tdAUC"` (time-dependent AUC),
 #'   `"cindex_t_year"` (C-index via \pkg{pec}),
 #'   `"cindex_survM"` (C-index via SurvM),
 #'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
 #'   `"calib_measures"` (calibration summary statistics).
-#' @param summary    Character vector of Brier-score summaries (relevant only
-#'   when `"Brier"` is in `metrics`): `"IBS"` for the integrated Brier score
-#'   and/or `"risks"` for per-risk summaries.
+#'   Note: requesting `"IBS"` implicitly also computes `"Brier"`.
 #' @param cens.method Censoring correction method passed to
-#'   `riskRegression::Score()` (default `"ipcw"`); relevant for `"Brier"`
-#'   and `"tdAUC"`.
+#'   `riskRegression::Score()` (default `"ipcw"`); relevant for `"Brier"`,
+#'   `"IBS"`, and `"tdAUC"`.
 #' @param cens.model  Censoring model used for IPCW weighting (default
-#'   `"km"`); relevant for `"Brier"` and `"tdAUC"`.
+#'   `"km"`); relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
 #' @param cens.code   Integer code denoting censored observations (default
 #'   `0`); relevant for `"calib_measures"`.
 #' @param se.fit      Logical; compute standard errors? (default `FALSE`);
-#'   relevant for `"brier"` and `"auc"`.
+#'   relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
 #' @param rmlt_tau    Upper integration limit for the restricted mean lifetime
 #'   (default `NULL`, which uses `max(eval_times)`); relevant only for
-#'   `"cidx_rmlt"`.
+#'   `"cindex_rmlt"`.
 #'
 #' @details
 #' The following metrics are supported, computed separately for each competing
@@ -50,6 +50,11 @@
 #'     squared error between predicted CIF values and event indicators at each
 #'     evaluation time.  Lower values indicate better calibration and
 #'     discrimination.  Computed via `riskRegression::Score()`.}
+#'
+#'   \item{`"IBS"`}{The integrated Brier score, summarising the time-dependent
+#'     Brier score into a single value by integration over `eval_times`.
+#'     Requesting `"IBS"` implicitly triggers computation of `"Brier"` as well.
+#'     Computed via `riskRegression::Score()`.}
 #'
 #'   \item{`"tdAUC"`}{The time-dependent cause-specific AUC, measuring the
 #'     probability that a randomly chosen case has a higher predicted CIF than
@@ -78,26 +83,21 @@
 #'     event fractions at each evaluation time.}
 #' }
 #'
-#' When `"Brier"` is requested, the `summary` argument controls whether the
-#' integrated Brier score (`"IBS"`) and/or per-risk summaries (`"risks"`) are
-#' also returned.
-#'
 #' @return A named list; elements present depend on the requested metrics:
 #'   `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `cindex_rmlt`,
 #'   `calib_measures`.  Each element is itself a named list with one entry per
 #'   cause (e.g. `$Brier$cause_1`, `$Brier$cause_2`).
 #' @export
-calculate_metrics <- function(cr, eval_times,
-                              cif          = NULL,
-                              fit          = NULL,
-                              cif_time_grid = NULL,
-                              metrics      = c("Brier", "tdAUC"),
-                              summary      = c("IBS", "risks"),
-                              cens.method  = "ipcw",
-                              cens.model   = "km",
-                              cens.code    = 0,
-                              se.fit       = FALSE,
-                              rmlt_tau     = NULL) {
+compute_metrics <- function(cr, eval_times,
+                            cif           = NULL,
+                            fit           = NULL,
+                            cif_time_grid = NULL,
+                            metrics       = c("Brier", "tdAUC"),
+                            cens.method   = "ipcw",
+                            cens.model    = "km",
+                            cens.code     = 0,
+                            se.fit        = FALSE,
+                            rmlt_tau      = NULL) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
 
@@ -126,18 +126,22 @@ calculate_metrics <- function(cr, eval_times,
   environment(f) <- asNamespace("prodlim")
 
   comp_brier <- "Brier"          %in% metrics
+  comp_ibs   <- "IBS"            %in% metrics
   comp_auc   <- "tdAUC"          %in% metrics
   comp_pec   <- "cindex_t_year"  %in% metrics
   comp_survM <- "cindex_survM"   %in% metrics
   comp_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
-  comp_ibs   <- comp_brier && ("IBS" %in% summary)
 
-  # Translate to riskRegression::Score() expected values
-  rr_metrics <- c("Brier" = "brier", "tdAUC" = "auc")
-  rr_summary <- c("IBS" = "ibs", "risks" = "risks")
-  rr_metrics <- unname(rr_metrics[intersect(metrics, names(rr_metrics))])
-  rr_summary <- unname(rr_summary[intersect(summary, names(rr_summary))])
+  # IBS requires Brier from riskRegression; always request "brier" when either
+  # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
+  # expected strings.
+  need_rr_brier <- comp_brier || comp_ibs
+  rr_metrics <- c(
+    if (need_rr_brier) "brier",
+    if (comp_auc)      "auc"
+  )
+  rr_summary <- if (comp_ibs) "ibs" else character(0)
 
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
@@ -177,8 +181,8 @@ calculate_metrics <- function(cr, eval_times,
         se.fit      = se.fit
       )
       rows <- sc$Brier$score$model == k_name
-      if (comp_brier) Brier[[nm]]  <- sc$Brier$score[rows, "Brier"]
-      if (comp_ibs)   IBS[[nm]] <- sc$Brier$score[rows, "IBS"]
+      if (comp_brier) Brier[[nm]] <- sc$Brier$score[rows, "Brier"]
+      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[rows, "IBS"]
       if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[
         sc$AUC$score$model == k_name, "AUC"]
     }
