@@ -85,8 +85,8 @@ CalibrationPlot <- function(cr,
     ),
     times = horizon
   )
-  aj          <- list(obs = obj$pstate[, cause_idx + 1L],
-                      se  = obj$std.err[, cause_idx + 1L])
+  aj          <- list(obs = as.numeric(obj$pstate[, cause_idx + 1L]),
+                      se  = as.numeric(obj$std.err[, cause_idx + 1L]))
   horizon_idx <- which.min(abs(tau - horizon))
   OE          <- aj$obs / mean(pred_at_tau[, horizon_idx])
   OE_summary  <- c(
