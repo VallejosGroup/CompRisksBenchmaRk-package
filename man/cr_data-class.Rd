@@ -51,5 +51,8 @@ supplied.}
 
 \item{\code{time_offset}}{Numeric offset that was added to times when the minimum
 observed time was zero (0 means no offset was applied).}
+
+\item{\code{cens_code}}{Integer code used to denote censored observations in
+\code{event_var} (default \code{0L}).}
 }}
 

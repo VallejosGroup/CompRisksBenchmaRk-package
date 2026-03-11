@@ -81,6 +81,10 @@ cr <- cr_data(pbc2, time_var = "time", event_var = "status")
 cr
 ```
 
+```{r prepare-summary, results = "asis"}
+summary(cr)
+```
+
 ---
 
 ## 2  The model registry
@@ -189,8 +193,8 @@ scores_cindex_FGR       <- compute_metrics(cr, time_grid, cif = cif_FGR,
                              metrics = "cindex_t_year", tau = tau)
 scores_cindex_rmlt_FGR  <- compute_metrics(cr, time_grid, cif = cif_FGR,
                              metrics = "cindex_rmlt", tau = tau)
-#scores_calib_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
-#                             metrics = "calib_measures")
+scores_calib_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
+                             metrics = "calib_measures")
 
 # --- csCPH ---
 scores_Brier_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
@@ -243,7 +247,7 @@ For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
 all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                 "cindex_rmlt") # "calib_measures")
+                 "cindex_rmlt", "calib_measures")
 
 scores <- lapply(cifs, function(cif)
   compute_metrics(cr, time_grid, cif = cif, metrics = all_metrics, tau = tau)

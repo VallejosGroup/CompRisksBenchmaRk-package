@@ -10,7 +10,8 @@ cr_data(
   event_var,
   sort_by_time = TRUE,
   id_var = NULL,
-  time_offset = 0
+  time_offset = 0,
+  cens_code = 0L
 )
 }
 \arguments{
@@ -28,6 +29,9 @@ factor; 0 = censored; no NAs).}
 \item{time_offset}{Non-negative numeric offset added to all times when the
 minimum observed time is zero.  Must be \code{> 0} in that case; an
 error is raised when it is \code{0} (the default).}
+
+\item{cens_code}{Integer code denoting censored observations in
+\code{event_var} (default \code{0}).}
 }
 \value{
 A \code{cr_data} S4 object.

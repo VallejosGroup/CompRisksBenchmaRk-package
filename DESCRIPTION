@@ -39,7 +39,8 @@ Imports:
     tibble,
     data.table,
     foreach,
-    abind
+    abind,
+    table1
 Suggests:
     randomForestSRC,
     fastcmprsk,

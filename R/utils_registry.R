@@ -11,19 +11,20 @@ NULL
 
 #' Extract competing causes from a data frame
 #'
-#' Derives the sorted vector of competing causes (all non-zero event codes)
+#' Derives the sorted vector of competing causes (all non-censored event codes)
 #' from the named event column of a data frame, coercing to integer if needed.
 #'
-#' @param data A data frame containing the event column.
+#' @param data      A data frame containing the event column.
 #' @param event_var Character string naming the event column in `data`.
+#' @param cens_code Integer code denoting censored observations (default `0L`).
 #'
 #' @return A sorted integer vector of cause codes.
 #' @noRd
-cr_causes <- function(data, event_var) {
+.cr_causes <- function(data, event_var, cens_code = 0L) {
   event <- data[[event_var]]
   if (!is.integer(event))
     event <- as.integer(as.character(event))
-  sort(unique(event[event != 0]))
+  sort(unique(event[event != as.integer(cens_code)]))
 }
 
 

@@ -18,6 +18,8 @@
 #' @slot sort_by_time Logical; whether rows were sorted by ascending time.
 #' @slot time_offset  Numeric offset that was added to times when the minimum
 #'   observed time was zero (0 means no offset was applied).
+#' @slot cens_code    Integer code used to denote censored observations in
+#'   \code{event_var} (default \code{0L}).
 #'
 #' @name cr_data-class
 #' @exportClass cr_data
@@ -32,7 +34,8 @@ methods::setClass("cr_data", representation(
   event_var    = "character",
   id_var       = "character",
   sort_by_time = "logical",
-  time_offset  = "numeric"
+  time_offset  = "numeric",
+  cens_code    = "integer"
 ))
 
 
@@ -51,13 +54,16 @@ methods::setClass("cr_data", representation(
 #' @param time_offset Non-negative numeric offset added to all times when the
 #'   minimum observed time is zero.  Must be \code{> 0} in that case; an
 #'   error is raised when it is \code{0} (the default).
+#' @param cens_code  Integer code denoting censored observations in
+#'   \code{event_var} (default \code{0}).
 #'
 #' @return A \code{cr_data} S4 object.
 #' @export
 cr_data <- function(data, time_var, event_var,
                     sort_by_time = TRUE,
                     id_var       = NULL,
-                    time_offset  = 0) {
+                    time_offset  = 0,
+                    cens_code    = 0L) {
 
   # --- Input validation ---
   if (!is.data.frame(data))
@@ -99,6 +105,10 @@ cr_data <- function(data, time_var, event_var,
   if (!is.numeric(time_offset) || length(time_offset) != 1 || time_offset < 0)
     stop("`time_offset` must be a single non-negative number.", call. = FALSE)
 
+  if (!is.numeric(cens_code) || length(cens_code) != 1)
+    stop("`cens_code` must be a single integer value.", call. = FALSE)
+  cens_code <- as.integer(cens_code)
+
   # --- Zero-time guard ---
   min_time <- suppressWarnings(min(data[[time_var]], na.rm = TRUE))
   if (is.finite(min_time) && min_time == 0) {
@@ -138,7 +148,7 @@ cr_data <- function(data, time_var, event_var,
     data <- data[order(data[[time_var]]), , drop = FALSE]
 
   # --- Cause and covariate extraction ---
-  causes <- cr_causes(data, event_var)
+  causes <- .cr_causes(data, event_var, cens_code)
   covars <- data.frame(covars_names = feature_cols,
                        covars_types = covars_types,
                        stringsAsFactors = FALSE)
@@ -151,9 +161,58 @@ cr_data <- function(data, time_var, event_var,
     event_var    = event_var,
     id_var       = if (!is.null(id_var)) id_var else "",
     sort_by_time = sort_by_time,
-    time_offset  = time_offset
+    time_offset  = time_offset,
+    cens_code    = cens_code
   )
 }
+
+
+#' Summarise a cr_data object
+#'
+#' Produces an HTML summary table of all covariates and the observed survival
+#' times, stratified by event status (censored + each competing cause), using
+#' the \pkg{table1} package.
+#'
+#' @param object A \code{cr_data} object.
+#' @param ... Currently unused.
+#'
+#' @return A \code{table1} object (printed as HTML, invisibly returned).
+#' @export
+methods::setMethod("summary", "cr_data", function(object, ...) {
+  d         <- object@data
+  time_var  <- object@time_var
+  event_var <- object@event_var
+  causes    <- object@causes
+  cens_code <- object@cens_code
+
+  # Build labelled event factor: "Censored" + "Cause k" for each cause
+  ev_int    <- as.integer(d[[event_var]])
+  cens_lbl  <- paste0("Censored (", cens_code, ")")
+  cause_lbls <- paste0("Cause ", causes)
+  lvls      <- c(cens_code, causes)
+  lbls      <- c(cens_lbl, cause_lbls)
+  ev_factor <- factor(ev_int, levels = lvls, labels = lbls)
+
+  # Assemble table data: time + covariates + event factor
+  covar_names <- object@covars$covars_names
+  tbl_data    <- cbind(
+    d[, c(time_var, covar_names), drop = FALSE],
+    .event_status = ev_factor
+  )
+
+  # Apply table1 labels: time_var gets a readable label
+  table1::label(tbl_data[[time_var]]) <- paste0("Survival time (", time_var, ")")
+
+  # Build formula: all vars on LHS, event factor on RHS
+  rhs_vars <- c(time_var, covar_names)
+  f <- stats::as.formula(
+    paste("~", paste(rhs_vars, collapse = " + "), "| .event_status")
+  )
+
+  tbl <- table1::table1(f, data = tbl_data, overall = "Overall")
+  print(tbl)
+  invisible(tbl)
+})
 
 
 #' @describeIn cr_data-class Print a concise summary of a \code{cr_data} object.
@@ -164,6 +223,7 @@ methods::setMethod("show", "cr_data", function(object) {
   cat(sprintf("  Rows      : %d\n", nrow(object@data)))
   cat(sprintf("  Columns   : %d\n", ncol(object@data)))
   cat(sprintf("  Causes    : %s\n", paste(object@causes, collapse = ", ")))
+  cat(sprintf("  cens_code : %d\n", object@cens_code))
   cat(sprintf("  time_var  : %s\n", object@time_var))
   cat(sprintf("  event_var : %s\n", object@event_var))
   if (nzchar(object@id_var))
@@ -222,13 +282,14 @@ methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
 
     methods::new("cr_data",
       data         = new_data,
-      causes       = cr_causes(new_data, x@event_var),
+      causes       = .cr_causes(new_data, x@event_var, x@cens_code),
       covars       = new_covars,
       time_var     = x@time_var,
       event_var    = x@event_var,
       id_var       = x@id_var,
       sort_by_time = x@sort_by_time,
-      time_offset  = x@time_offset
+      time_offset  = x@time_offset,
+      cens_code    = x@cens_code
     )
   }
 )
