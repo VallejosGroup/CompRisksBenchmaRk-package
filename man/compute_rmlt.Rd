@@ -19,15 +19,14 @@ Mutually exclusive with `cif`.}
 
 \item{cif_time_grid}{Numeric vector of time points passed to [predict_cif()]
 when `fit` is non-`NULL`.  Must be provided when `fit` is supplied;
-ignored when `cif` is supplied directly (times are taken from
-`cif$time_grid`).}
+must be `NULL` when `cif` is supplied directly.}
 
 \item{maxT}{Upper integration limit. Defaults to the maximum
 observed event time in `cr`. A message is issued when the default is used.}
 }
 \value{
 An `[n x K]` numeric matrix of per-subject RMLTs, with column names
-  `"cause_1"`, `"cause_2"`, etc.
+  `"cause_<k>"` where `<k>` is the actual cause code from `cr@causes`.
 }
 \description{
 Integrates each subject's cumulative incidence function (CIF) up to `maxT`
