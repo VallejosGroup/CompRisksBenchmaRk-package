@@ -203,30 +203,55 @@ sapply(scores, function(s) s$IBS["cause_2", "value"])
 
 ## 5  Calibration
 
+`CalibrationPlot()` accepts a `cr_data` object and a CIF list (as returned by
+`predict_cif()`), slices the requested cause internally, and derives the model
+label from `$model_key`.  Here we plot calibration at the 5-year horizon for
+cause 2 (death) for each model.
+
 ```{r calibration, fig.alt="Calibration plots for cause 2 (death) at 5 years"}
 horizon <- 5
-hi      <- which.min(abs(time_grid - horizon))
 
-# Calibration plot for each model at the 5-year horizon for cause 2 (death)
-cal_list <- lapply(model_keys, function(key) {
-  CalibrationPlot(
-    model_name       = key,
-    predictions      = cifs[[key]]$cif[, 2, hi],
-    data             = cr@data,
-    time             = cr@data[[cr@time_var]],
-    status           = cr@data[[cr@event_var]],
-    tau              = horizon,
-    cause            = 2,
-    predictions.type = "CIF",
-    loess_smoothing  = TRUE,
-    graph            = TRUE
-  )
-})
-names(cal_list) <- model_keys
+cal_FGR <- CalibrationPlot(
+  cr    = cr,
+  cif   = cif_FGR,
+  tau   = horizon,
+  cause = 2,
+  graph = TRUE
+)
 
-lapply(cal_list, function(cal) print(cal$graphs[[1]]))
-cal_list$FGR$calib.measures[[1]]    # ICI, E50, E90, Emax, RSB for FGR
-cal_list$FGR$OE_summary             # O/E ratio with 95% CI for FGR
+cal_csCPH <- CalibrationPlot(
+  cr    = cr,
+  cif   = cif_csCPH,
+  tau   = horizon,
+  cause = 2,
+  graph = TRUE
+)
+
+cal_RSF <- CalibrationPlot(
+  cr    = cr,
+  cif   = cif_RSF,
+  tau   = horizon,
+  cause = 2,
+  graph = TRUE
+)
+
+cal_FGRP <- CalibrationPlot(
+  cr    = cr,
+  cif   = cif_FGRP,
+  tau   = horizon,
+  cause = 2,
+  graph = TRUE
+)
+
+# Print plots
+print(cal_FGR$graphs[[1]])
+print(cal_csCPH$graphs[[1]])
+print(cal_RSF$graphs[[1]])
+print(cal_FGRP$graphs[[1]])
+
+# Calibration measures (ICI, E50, E90, Emax, RSB) and O/E ratio for FGR
+cal_FGR$calib.measures[[1]]
+cal_FGR$OE_summary
 ```
 
 ---
