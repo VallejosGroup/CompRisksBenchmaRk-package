@@ -46,6 +46,16 @@
 #'   For `"calib_measures"`, columns are the calibration statistics, with one
 #'   row per cause per evaluation time and an additional `time` column.
 #'
+#' @param tau      Numeric scalar passed as `eval.times` to `pec::cindex()`
+#'   for `"cindex_t_year"` and `"cindex_rmlt"`.  Defaults to the maximum
+#'   observed event time in `cr` when either of those metrics is requested.
+#'   A warning is issued when the default is used, as IPCW weights become
+#'   unstable near the end of follow-up; supplying a lower value is
+#'   recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
+#'   is in `metrics`.
+#' @param ...      Additional arguments passed to `pec::cindex()` and
+#'   `riskRegression::Score()`.
+#'
 #' @details
 #' The following metrics are supported, computed separately for each competing
 #' cause:
@@ -98,8 +108,10 @@ compute_metrics <- function(cr, eval_times,
                             cens.model    = "km",
                             cens.code     = 0,
                             se.fit        = FALSE,
-                            rmlt_tau      = NULL,
-                            collapse_as_df = TRUE) {
+                            rmlt_tau       = NULL,
+                            collapse_as_df = TRUE,
+                            tau            = NULL,
+                            ...) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
   
@@ -120,6 +132,17 @@ compute_metrics <- function(cr, eval_times,
   event_var <- cr@event_var
   causes    <- cr@causes
   idx_nms   <- paste0("cause_", causes)
+  
+  if (is.null(tau) && (comp_pec || comp_rmlt)) {
+    tau <- max(cr@data[[time_var]][cr@data[[event_var]] != 0])
+    warning(
+      "`tau` not supplied; defaulting to the maximum observed event time (",
+      round(tau, 4), "). This affects C-index estimates (`cindex_t_year` and ",
+      "`cindex_rmlt`) only. IPCW weights are unstable near the end of ",
+      "follow-up — consider supplying a lower value.",
+      call. = FALSE
+    )
+  }
   
   d  <- dim(cif)
   n  <- d[1]; Tm <- d[3]
@@ -179,7 +202,8 @@ compute_metrics <- function(cr, eval_times,
         cens.method = cens.method,
         cens.model  = cens.model,
         se.fit      = se.fit,
-        null.model  = FALSE
+        null.model  = FALSE,
+        ...
       )
       rows <- sc$Brier$score$model == k_name
       if (comp_brier) Brier[[nm]] <- sc$Brier$score[rows, ][["Brier"]]
@@ -193,12 +217,13 @@ compute_metrics <- function(cr, eval_times,
         object      = preds,
         formula     = f,
         data        = cr@data,
-        eval.times  = eval_times,
+        eval.times  = tau,
         pred.times  = eval_times,
         cause       = k,
         cens.model  = "marginal",
         splitMethod = "noPlan",
-        verbose     = FALSE
+        verbose     = FALSE,
+        ...
       )
       cindex_t_year[[nm]] <- cidx$AppCindex[[k_name]]
     }
@@ -212,10 +237,11 @@ compute_metrics <- function(cr, eval_times,
         object      = preds_rmlt,
         formula     = f,
         data        = cr@data,
-        eval.times  = max(eval_times),
+        eval.times  = tau,
         cens.model  = "marginal",
         splitMethod = "noPlan",
-        verbose     = FALSE
+        verbose     = FALSE,
+        ...
       )
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[k_name_rmlt]]
     }

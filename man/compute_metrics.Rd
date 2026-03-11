@@ -16,7 +16,9 @@ compute_metrics(
   cens.code = 0,
   se.fit = FALSE,
   rmlt_tau = NULL,
-  collapse_as_df = TRUE
+  collapse_as_df = TRUE,
+  tau = NULL,
+  ...
 )
 }
 \arguments{
@@ -69,6 +71,17 @@ the output list is collapsed into a data frame with one row per cause.  For time
 metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
 For `"calib_measures"`, columns are the calibration statistics, with one
 row per cause per evaluation time and an additional `time` column.}
+
+\item{tau}{Numeric scalar passed as `eval.times` to `pec::cindex()`
+for `"cindex_t_year"` and `"cindex_rmlt"`.  Defaults to the maximum
+observed event time in `cr` when either of those metrics is requested.
+A warning is issued when the default is used, as IPCW weights become
+unstable near the end of follow-up; supplying a lower value is
+recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
+is in `metrics`.}
+
+\item{...}{Additional arguments passed to `pec::cindex()` and
+`riskRegression::Score()`.}
 }
 \value{
 When `collapse_as_df = TRUE` (default), each metric element is a

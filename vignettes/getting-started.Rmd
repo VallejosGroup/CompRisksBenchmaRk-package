@@ -180,7 +180,7 @@ scores_brier_FGR <- compute_metrics(
   cr         = cr,
   eval_times = time_grid,
   cif        = cif_FGR,
-  metrics = c("Brier", "IBS")
+  metrics = c("Brier", "IBS", "cindex_t_year", "cindex_rmlt")
 )
 scores_auc_FGR <- compute_metrics(
   cr         = cr,
@@ -244,7 +244,7 @@ scores <- lapply(cifs, function(cif)
     cr      = cr,
     eval_times = time_grid,
     cif     = cif,
-      metrics = c("Brier", "IBS", "tdAUC")
+      metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year", "cindex_rmlt")
   )
 )
 
