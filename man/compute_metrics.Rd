@@ -76,11 +76,12 @@ default.}
 default.}
 
 \item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
-the output list is collapsed into a data frame with one row per cause.  For time-varying metrics (`"Brier"`, `"tdAUC"`,
-`"cindex_t_year"`), columns correspond to `eval_times`.  For scalar
-metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
-For `"calib_measures"`, columns are the calibration statistics, with one
-row per cause per evaluation time and an additional `time` column.}
+the output list is collapsed into a data frame with one row per cause.
+For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
+columns correspond to `eval_times`.  For scalar metrics (`"IBS"`,
+`"cindex_rmlt"`), a single `value` column is used.  For
+`"calib_measures"`, columns are the calibration statistics, with one row
+per cause per evaluation time and an additional `time` column.}
 }
 \value{
 When `collapse_as_df = TRUE` (default), each metric element is a
