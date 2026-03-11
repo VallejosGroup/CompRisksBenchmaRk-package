@@ -133,17 +133,6 @@ compute_metrics <- function(cr, eval_times,
   causes    <- cr@causes
   idx_nms   <- paste0("cause_", causes)
   
-  if (is.null(tau) && (comp_pec || comp_rmlt)) {
-    tau <- max(cr@data[[time_var]][cr@data[[event_var]] != 0])
-    warning(
-      "`tau` not supplied; defaulting to the maximum observed event time (",
-      round(tau, 4), "). This affects C-index estimates (`cindex_t_year` and ",
-      "`cindex_rmlt`) only. IPCW weights are unstable near the end of ",
-      "follow-up — consider supplying a lower value.",
-      call. = FALSE
-    )
-  }
-  
   d  <- dim(cif)
   n  <- d[1]; Tm <- d[3]
   
@@ -156,6 +145,17 @@ compute_metrics <- function(cr, eval_times,
   comp_pec   <- "cindex_t_year"  %in% metrics
   comp_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
+  
+  if (is.null(tau) && (comp_pec || comp_rmlt)) {
+    tau <- max(cr@data[[time_var]][cr@data[[event_var]] != 0])
+    warning(
+      "`tau` not supplied; defaulting to the maximum observed event time (",
+      round(tau, 4), "). This affects C-index estimates (`cindex_t_year` and ",
+      "`cindex_rmlt`) only. IPCW weights are unstable near the end of ",
+      "follow-up — consider supplying a lower value.",
+      call. = FALSE
+    )
+  }
   
   # IBS requires Brier from riskRegression; always request "brier" when either
   # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
@@ -213,11 +213,12 @@ compute_metrics <- function(cr, eval_times,
     }
     
     if (comp_pec) {
+      pec_eval_times <- if (length(eval_times) > 1) rep(tau, length(eval_times)) else tau
       cidx <- pec::cindex(
         object      = preds,
         formula     = f,
         data        = cr@data,
-        eval.times  = tau,
+        eval.times  = pec_eval_times,
         pred.times  = eval_times,
         cause       = k,
         cens.model  = "marginal",
@@ -238,6 +239,7 @@ compute_metrics <- function(cr, eval_times,
         formula     = f,
         data        = cr@data,
         eval.times  = tau,
+        cause       = k,
         cens.model  = "marginal",
         splitMethod = "noPlan",
         verbose     = FALSE,
