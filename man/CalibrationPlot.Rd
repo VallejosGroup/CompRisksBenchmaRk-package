@@ -2,7 +2,7 @@
 % Please edit documentation in R/CalibrationPlot.R
 \name{CalibrationPlot}
 \alias{CalibrationPlot}
-\title{Calibration plot for competing risks}
+\title{Calibration plots for competing risks}
 \usage{
 CalibrationPlot(
   cr,
@@ -10,7 +10,6 @@ CalibrationPlot(
   fit = NULL,
   cif_time_grid = NULL,
   tau,
-  cause,
   loess_smoothing = TRUE,
   bandwidth = NULL,
   graph = TRUE
@@ -33,9 +32,6 @@ when `fit` is non-`NULL`. Must be `NULL` when `cif` is supplied directly.}
 
 \item{tau}{Numeric scalar or vector of evaluation times.}
 
-\item{cause}{Integer cause code of interest (must be in
-`cr@causes`).}
-
 \item{loess_smoothing}{If `TRUE` (default), use LOESS smoothing;
 otherwise use `prodlim::meanNeighbors()`.}
 
@@ -44,11 +40,23 @@ otherwise use `prodlim::meanNeighbors()`.}
 \item{graph}{Logical; produce ggplot objects? (default `TRUE`).}
 }
 \value{
-A list with elements `graphs`, `values`, `calib.measures`, and
-  `OE_summary`.
+A list with four elements:
+  \describe{
+    \item{`graphs`}{Named list (one entry per cause, e.g. `"cause_1"`) of
+      plot lists, each with one ggplot per element of `tau`.  `NULL` when
+      `graph = FALSE`.}
+    \item{`values`}{Named list (one entry per cause) of smoothed calibration
+      data frames, each with one data frame per element of `tau`.}
+    \item{`calib_measures`}{Data frame with columns `cause`, `tau`, `ICI`,
+      `E50`, `E90`, `Emax`, `RSB`.  One row per cause per evaluation time.}
+    \item{`OE_summary`}{Data frame with columns `cause`, `OE`, `lower`,
+      `upper` (95\% CI).  One row per cause, evaluated at the last element
+      of `tau`.}
+  }
 }
 \description{
-Produces a pseudo-value calibration plot using LOESS or nearest-neighbour
-smoothing.  Returns the plot objects, smoothed calibration frames, and
-numerical calibration measures.
+Produces pseudo-value calibration plots using LOESS or nearest-neighbour
+smoothing for all competing causes.  Returns plot objects, smoothed
+calibration frames, and numerical calibration measures in a format
+consistent with [compute_metrics()].
 }

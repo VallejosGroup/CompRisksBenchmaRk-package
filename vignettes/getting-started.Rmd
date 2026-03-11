@@ -204,53 +204,26 @@ sapply(scores, function(s) s$IBS["cause_2", "value"])
 ## 5  Calibration
 
 `CalibrationPlot()` accepts a `cr_data` object and a CIF list (as returned by
-`predict_cif()`), slices the requested cause internally, and derives the model
-label from `$model_key`.  Here we plot calibration at the 5-year horizon for
-cause 2 (death) for each model.
+`predict_cif()`), iterates over all competing causes internally, and derives
+the model label from `$model_key`.  Here we plot calibration at the 5-year
+horizon for each model and each cause.
 
-```{r calibration, fig.alt="Calibration plots for cause 2 (death) at 5 years"}
+```{r calibration, fig.alt="Calibration plots at 5 years for all causes"}
 horizon <- 5
 
-cal_FGR <- CalibrationPlot(
-  cr    = cr,
-  cif   = cif_FGR,
-  tau   = horizon,
-  cause = 2,
-  graph = TRUE
-)
+cal_FGR   <- CalibrationPlot(cr = cr, cif = cif_FGR,   tau = horizon)
+cal_csCPH <- CalibrationPlot(cr = cr, cif = cif_csCPH, tau = horizon)
+cal_RSF   <- CalibrationPlot(cr = cr, cif = cif_RSF,   tau = horizon)
+cal_FGRP  <- CalibrationPlot(cr = cr, cif = cif_FGRP,  tau = horizon)
 
-cal_csCPH <- CalibrationPlot(
-  cr    = cr,
-  cif   = cif_csCPH,
-  tau   = horizon,
-  cause = 2,
-  graph = TRUE
-)
+# Print all plots (one per cause per model)
+for (cal in list(cal_FGR, cal_csCPH, cal_RSF, cal_FGRP))
+  lapply(cal$graphs, function(p) print(p[[1]]))
 
-cal_RSF <- CalibrationPlot(
-  cr    = cr,
-  cif   = cif_RSF,
-  tau   = horizon,
-  cause = 2,
-  graph = TRUE
-)
+# Calibration measures (ICI, E50, E90, Emax, RSB) for FGR — all causes
+cal_FGR$calib_measures
 
-cal_FGRP <- CalibrationPlot(
-  cr    = cr,
-  cif   = cif_FGRP,
-  tau   = horizon,
-  cause = 2,
-  graph = TRUE
-)
-
-# Print plots
-print(cal_FGR$graphs[[1]])
-print(cal_csCPH$graphs[[1]])
-print(cal_RSF$graphs[[1]])
-print(cal_FGRP$graphs[[1]])
-
-# Calibration measures (ICI, E50, E90, Emax, RSB) and O/E ratio for FGR
-cal_FGR$calib.measures[[1]]
+# O/E ratios with 95% CI for FGR — all causes
 cal_FGR$OE_summary
 ```
 

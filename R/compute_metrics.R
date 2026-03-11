@@ -278,18 +278,19 @@ compute_metrics <- function(cr, eval_times = NULL,
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
 
-    if (comp_calib) {
-      cm <- CalibrationPlot(
-        cr            = cr,
-        cif           = list(cif = cif, time_grid = cif_time_grid,
-                             model_key = nm),
-        tau           = eval_times,
-        cause         = k,
-        loess_smoothing = TRUE,
-        graph         = FALSE
-      )$calib.measures
-      calib_measures[[nm]] <- do.call(rbind, Filter(Negate(is.null), cm))
-    }
+  }
+
+  if (comp_calib) {
+    cal <- CalibrationPlot(
+      cr              = cr,
+      cif             = list(cif = cif, time_grid = cif_time_grid,
+                             model_key = cause_nms[1]),
+      tau             = eval_times,
+      loess_smoothing = TRUE,
+      graph           = FALSE
+    )
+    for (nm in cause_nms)
+      calib_measures[[nm]] <- cal$calib_measures[cal$calib_measures$cause == nm, ]
   }
 
   result <- Filter(Negate(is.null), list(
