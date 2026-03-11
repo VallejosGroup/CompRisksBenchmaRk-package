@@ -4,21 +4,13 @@
 \alias{compute_rmlt}
 \title{Compute the restricted mean lifetime (RMLT) from a CIF array}
 \usage{
-compute_rmlt(
-  cr,
-  eval_times,
-  cif = NULL,
-  fit = NULL,
-  cif_time_grid = NULL,
-  tau = max(eval_times)
-)
+compute_rmlt(cr, cif = NULL, fit = NULL, cif_time_grid = NULL, maxT = NULL)
 }
 \arguments{
 \item{cr}{A [cr_data()] object.}
 
-\item{eval_times}{Numeric vector of evaluation times (length `Tm`).}
-
-\item{cif}{3-D numeric array with dimensions `[n, K, Tm]`.
+\item{cif}{A list as returned by [predict_cif()], with elements
+`$cif` (3-D numeric array `[n, K, Tm]`) and `$time_grid` (numeric vector).
 Mutually exclusive with `fit`.}
 
 \item{fit}{A fitted model object as returned by [fit_cr_model()].
@@ -27,19 +19,21 @@ Mutually exclusive with `cif`.}
 
 \item{cif_time_grid}{Numeric vector of time points passed to [predict_cif()]
 when `fit` is non-`NULL`.  Must be provided when `fit` is supplied;
-ignored when `cif` is supplied directly.}
+ignored when `cif` is supplied directly (times are taken from
+`cif$time_grid`).}
 
-\item{tau}{Upper integration limit (default `max(eval_times)`).}
+\item{maxT}{Upper integration limit. Defaults to the maximum
+observed event time in `cr`. A message is issued when the default is used.}
 }
 \value{
 An `[n x K]` numeric matrix of per-subject RMLTs, with column names
   `"cause_1"`, `"cause_2"`, etc.
 }
 \description{
-Integrates each subject's cumulative incidence function (CIF) up to `tau`
+Integrates each subject's cumulative incidence function (CIF) up to `maxT`
 using trapezoidal integration, returning a per-subject RMLT for each
 competing cause.  Predictions can be supplied either as a pre-computed CIF
-array via `cif`, or as a fitted model object via `fit` (in which case the
+list via `cif`, or as a fitted model object via `fit` (in which case the
 CIF is computed internally using [predict_cif()]).  Exactly one of `cif` or
 `fit` must be non-`NULL`.
 }

@@ -178,10 +178,10 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR$cif,   tau = tau)
-scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH$cif, tau = tau)
-scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF$cif,   tau = tau)
-scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP$cif,  tau = tau)
+scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR,   tau = tau)
+scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH, tau = tau)
+scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF,   tau = tau)
+scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP,  tau = tau)
 
 # Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
 scores_FGR$IBS
@@ -191,8 +191,8 @@ scores_FGR$Brier
 For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
-scores <- lapply(cifs, function(x)
-  compute_metrics(cr, time_grid, cif = x$cif, tau = tau)
+scores <- lapply(cifs, function(cif)
+  compute_metrics(cr, time_grid, cif = cif, tau = tau)
 )
 
 # Compare IBS for cause 2 across models

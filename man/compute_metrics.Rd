@@ -15,6 +15,7 @@ compute_metrics(
   cens_model_rr = "km",
   se_fit_rr = FALSE,
   tau = NULL,
+  maxT_rmlt = NULL,
   collapse_as_df = TRUE,
   ...
 )
@@ -23,15 +24,15 @@ compute_metrics(
 \item{cr}{A [cr_data()] object providing the test-set outcomes, time
 and event variable names, and cause codes.}
 
-\item{eval_times}{Numeric vector of evaluation times (length `Tm`).}
+\item{eval_times}{Numeric vector of evaluation times for the metrics (length `Tm`).}
 
-\item{cif}{3-D numeric array with dimensions `[n, K, Tm]`, where `n`
-is the number of subjects, `K` the number of competing causes, and `Tm`
-the number of evaluation times.  Mutually exclusive with `fit`.}
+\item{cif}{A list as returned by [predict_cif()], with elements
+`$cif` (3-D numeric array `[n, K, Tm]`) and `$time_grid` (numeric vector).
+Mutually exclusive with `fit`.}
 
-\item{fit}{A fitted model object as returned by [fit_cr_model()] or a
-registered model's `fit` function.  When supplied, the CIF is computed via
-[predict_cif()] before scoring.  Mutually exclusive with `cif`.}
+\item{fit}{A fitted model object as returned by [fit_cr_model()].
+When supplied, the CIF is computed via [predict_cif()] before scoring.
+Mutually exclusive with `cif`.}
 
 \item{cif_time_grid}{Numeric vector of time points passed to [predict_cif()]
 when `fit` is non-`NULL` (default `NULL`).  Must be provided when `fit`
@@ -63,6 +64,12 @@ A warning is issued when the default is used, as IPCW weights become
 unstable near the end of follow-up; supplying a lower value is
 recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
 is in `metrics`.}
+
+\item{maxT_rmlt}{Numeric scalar passed as `maxT` to [compute_rmlt()] when
+`"cindex_rmlt"` is in `metrics`.  Controls the upper integration limit for
+the restricted mean lifetime.  Defaults to the maximum observed event time
+in `cr` (see [compute_rmlt()]).  Ignored when `"cindex_rmlt"` is not
+requested.}
 
 \item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
 the output list is collapsed into a data frame with one row per cause.  For time-varying metrics (`"Brier"`, `"tdAUC"`,

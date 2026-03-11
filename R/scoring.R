@@ -150,25 +150,27 @@ get_results <- function(data_root,
 
       cr_test <- cr_data(df_test, time_var = "time", event_var = "event")
 
+      cif_out <- list(cif = out, time_grid = times)
+
       res[[model]][[v]] <- compute_metrics(
         cr             = cr_test,
         eval_times     = times,
-        cif            = out,
+        cif            = cif_out,
         metrics        = c("Brier", "IBS", "tdAUC", "calib_measures"),
-        cens.method    = "ipcw",
-        cens.model     = "km",
+        args_riskRegression = list(cens.method = "ipcw", cens.model = "km"),
         collapse_as_df = FALSE
       )
 
       all_cifs[[model]][[v]] <- out
       all_test[[v]]          <- df_test
 
-      all_rmlt[[model]][[v]] <- compute_rmlt(cr_test, times,
-                                             cif = out, tau = max(times))
+      all_rmlt[[model]][[v]] <- compute_rmlt(cr_test,
+                                             cif  = cif_out,
+                                             maxT = max(times))
       res_rmlt[[model]][[v]] <- compute_metrics(
         cr             = cr_test,
         eval_times     = max(times),
-        cif            = out,
+        cif            = cif_out,
         metrics        = "cindex_rmlt",
         collapse_as_df = FALSE
       )
