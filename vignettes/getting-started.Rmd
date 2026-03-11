@@ -57,14 +57,12 @@ Time is recorded in days; we convert to years for readability.
 ```{r data}
 library(CompRisksBenchmaRk)
 library(survival)
-
 data(pbc, package = "survival")
 pbc2 <- pbc
 pbc2$time <- pbc2$time / 365.25             # days -> years
 pbc2$stage <- as.factor(                     # group stages 1-2 vs 3 vs 4
   ifelse(pbc2$stage %in% c(1, 2), "1-2", as.character(pbc2$stage))
 )
-
 feature_cols <- c("age", "stage", "bili", "albumin", "protime", "trt")
 pbc2 <- pbc2[, c("time", "status", feature_cols)]
 pbc2         <- pbc2[complete.cases(pbc2), ]
@@ -179,75 +177,21 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-# --- FGR ---
-scores_Brier_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "Brier")
-scores_IBS_FGR          <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "IBS")
-scores_tdAUC_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "tdAUC")
-scores_cindex_FGR       <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "cindex_t_year", tau = tau)
-scores_cindex_rmlt_FGR  <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "cindex_rmlt", tau = tau)
-#scores_calib_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
-#                             metrics = "calib_measures")
-
-# --- csCPH ---
-scores_Brier_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "Brier")
-scores_IBS_csCPH         <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "IBS")
-scores_tdAUC_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "tdAUC")
-scores_cindex_csCPH      <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "cindex_t_year", tau = tau)
-scores_cindex_rmlt_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "cindex_rmlt", tau = tau)
-#scores_calib_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-#                              metrics = "calib_measures")
-
-# --- RSF ---
-scores_Brier_RSF         <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "Brier")
-scores_IBS_RSF           <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "IBS")
-scores_tdAUC_RSF         <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "tdAUC")
-scores_cindex_RSF        <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "cindex_t_year", tau = tau)
-scores_cindex_rmlt_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "cindex_rmlt", tau = tau)
-scores_calib_RSF         <- compute_metrics(cr, time_grid, cif = cif_RSF,
-                              metrics = "calib_measures")
-
-# --- FGRP ---
-scores_Brier_FGRP        <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "Brier")
-scores_IBS_FGRP          <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "IBS")
-scores_tdAUC_FGRP        <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "tdAUC")
-scores_cindex_FGRP       <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "cindex_t_year", tau = tau)
-scores_cindex_rmlt_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "cindex_rmlt", tau = tau)
-scores_calib_FGRP        <- compute_metrics(cr, time_grid, cif = cif_FGRP,
-                              metrics = "calib_measures")
+scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR,   tau = tau)
+scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH, tau = tau)
+scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF,   tau = tau)
+scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP,  tau = tau)
 
 # Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
-scores_IBS_FGR$IBS
-scores_Brier_FGR$Brier
+scores_FGR$IBS
+scores_FGR$Brier
 ```
 
 For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
-all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                 "cindex_rmlt") # "calib_measures")
-
 scores <- lapply(cifs, function(cif)
-  compute_metrics(cr, time_grid, cif = cif, metrics = all_metrics, tau = tau)
+  compute_metrics(cr, time_grid, cif = cif, tau = tau)
 )
 
 # Compare IBS for cause 2 across models
