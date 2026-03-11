@@ -59,18 +59,15 @@ library(CompRisksBenchmaRk)
 library(survival)
 
 data(pbc, package = "survival")
-pbc2        <- pbc[!is.na(pbc$trt), ]         # randomised patients only
-pbc2$time   <- pbc2$time / 365.25             # days -> years
-pbc2$stage  <- as.factor(                     # group stages 1-2 vs 3 vs 4
+pbc2 <- pbc
+pbc2$time <- pbc2$time / 365.25             # days -> years
+pbc2$stage <- as.factor(                     # group stages 1-2 vs 3 vs 4
   ifelse(pbc2$stage %in% c(1, 2), "1-2", as.character(pbc2$stage))
 )
 
-feature_cols <- c("age", "stage", "bili", "albumin", "protime")
-pbc2         <- pbc2[, c("time", "status", feature_cols)]
+feature_cols <- c("age", "stage", "bili", "albumin", "protime", "trt")
+pbc2 <- pbc2[, c("time", "status", feature_cols)]
 pbc2         <- pbc2[complete.cases(pbc2), ]
-
-table(pbc2$status)
-table(pbc2$stage)
 ```
 
 `cr_data()` validates inputs, coerces the event column, records covariate
@@ -193,8 +190,8 @@ scores_cindex_FGR       <- compute_metrics(cr, time_grid, cif = cif_FGR,
                              metrics = "cindex_t_year", tau = tau)
 scores_cindex_rmlt_FGR  <- compute_metrics(cr, time_grid, cif = cif_FGR,
                              metrics = "cindex_rmlt", tau = tau)
-scores_calib_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
-                             metrics = "calib_measures")
+#scores_calib_FGR        <- compute_metrics(cr, time_grid, cif = cif_FGR,
+#                             metrics = "calib_measures")
 
 # --- csCPH ---
 scores_Brier_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
@@ -207,8 +204,8 @@ scores_cindex_csCPH      <- compute_metrics(cr, time_grid, cif = cif_csCPH,
                               metrics = "cindex_t_year", tau = tau)
 scores_cindex_rmlt_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH,
                               metrics = "cindex_rmlt", tau = tau)
-scores_calib_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
-                              metrics = "calib_measures")
+#scores_calib_csCPH       <- compute_metrics(cr, time_grid, cif = cif_csCPH,
+#                              metrics = "calib_measures")
 
 # --- RSF ---
 scores_Brier_RSF         <- compute_metrics(cr, time_grid, cif = cif_RSF,
@@ -247,7 +244,7 @@ For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
 all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                 "cindex_rmlt", "calib_measures")
+                 "cindex_rmlt") # "calib_measures")
 
 scores <- lapply(cifs, function(cif)
   compute_metrics(cr, time_grid, cif = cif, metrics = all_metrics, tau = tau)
