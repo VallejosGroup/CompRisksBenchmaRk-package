@@ -327,7 +327,7 @@ compute_metrics <- function(cr, eval_times = NULL,
     lst <- result[[metric_nm]]
     if (metric_nm == "cindex_rmlt") {
       # cindex_rmlt is scalar per cause -> one-column data frame
-      vals <- vapply(lst, function(x) x[[1]], numeric(1))
+      vals <- vapply(lst, as.numeric, numeric(1))
       df   <- data.frame(value = vals, row.names = names(lst))
     } else if (metric_nm == "calib_measures") {
       # per-cause data frames (rows = eval_times) -> rbind with cause column
