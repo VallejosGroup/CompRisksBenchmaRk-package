@@ -163,22 +163,20 @@ compute_metrics <- function(cr, eval_times,
   comp_auc   <- "tdAUC"          %in% metrics
   comp_cidx_t   <- "cindex_t_year"  %in% metrics
   if (comp_cidx_t)
-    warning(
+    message(
       "`cindex_t_year` is not recommended: the C-index is not a proper metric ",
-      "for t-year predictions. Consider `cindex_rmlt` instead.",
-      call. = FALSE
+      "for t-year predictions. Consider `cindex_rmlt` instead."
     )
   comp_cidx_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
   
   if (is.null(tau) && (comp_cidx_t || comp_cidx_rmlt)) {
     tau <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
-    warning(
+    message(
       "`tau` not supplied; defaulting to the maximum observed event time (",
       round(tau, 4), "). This affects C-index estimates (`cindex_t_year` and ",
       "`cindex_rmlt`) only. IPCW weights are unstable near the end of ",
-      "follow-up — consider supplying a lower value.",
-      call. = FALSE
+      "follow-up — consider supplying a lower value."
     )
   }
   
