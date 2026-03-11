@@ -70,7 +70,7 @@ compute_rmlt <- function(cr,
   
   if (length(idx_t) < 2) {
     res <- matrix(0, nrow = n, ncol = K)
-    colnames(res) <- paste0("cause_", seq_len(K))
+    colnames(res) <- paste0("cause_", cr@causes)
     return(res)
   }
   
@@ -80,6 +80,6 @@ compute_rmlt <- function(cr,
     cif_mat  <- matrix(cif[, k, idx_t, drop = FALSE], nrow = n)
     res[, k] <- apply(cif_mat, 1, .trapezoidal_integration, x = times_use)
   }
-  colnames(res) <- paste0("cause_", seq_len(K))
+  colnames(res) <- paste0("cause_", cr@causes)
   res
 }
