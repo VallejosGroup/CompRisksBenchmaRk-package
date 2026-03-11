@@ -27,18 +27,13 @@
 #'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
 #'   `"calib_measures"` (calibration summary statistics).
 #'   Note: requesting `"IBS"` implicitly also computes `"Brier"`.
-#' @param cens.method Censoring correction method passed to
+#' @param cens_method_rr Censoring correction method passed to
 #'   `riskRegression::Score()` (default `"ipcw"`); relevant for `"Brier"`,
 #'   `"IBS"`, and `"tdAUC"`.
-#' @param cens.model  Censoring model used for IPCW weighting (default
+#' @param cens_model_rr  Censoring model used for IPCW weighting (default
 #'   `"km"`); relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
-#' @param cens.code   Integer code denoting censored observations (default
-#'   `0`); relevant for `"calib_measures"`.
-#' @param se.fit      Logical; compute standard errors? (default `FALSE`);
+#' @param se_fit_rr      Logical; compute standard errors? (default `FALSE`);
 #'   relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
-#' @param rmlt_tau    Upper integration limit for the restricted mean lifetime
-#'   (default `NULL`, which uses `max(eval_times)`); relevant only for
-#'   `"cindex_rmlt"`.
 #' @param collapse_as_df Logical; if `TRUE` (default), each metric element in
 #'   the output list is collapsed into a data frame with one row per cause.  For time-varying metrics (`"Brier"`, `"tdAUC"`,
 #'   `"cindex_t_year"`), columns correspond to `eval_times`.  For scalar
@@ -53,8 +48,12 @@
 #'   unstable near the end of follow-up; supplying a lower value is
 #'   recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
 #'   is in `metrics`.
-#' @param ...      Additional arguments passed to `pec::cindex()` and
-#'   `riskRegression::Score()`.
+#' @param ...      Additional arguments passed to both `pec::cindex()` and
+#'   `riskRegression::Score()`. Use with care: both functions receive the same
+#'   `...`, so passing an argument whose name exists in one but not the other
+#'   (or with different meanings) may cause errors or silently alter behaviour.
+#'   When in doubt, prefer the dedicated parameters (`cens_method_rr`,
+#'   `cens_model_rr`, `se_fit_rr`, `tau`) over `...`.
 #'
 #' @details
 #' The following metrics are supported, computed separately for each competing
@@ -84,7 +83,7 @@
 #'
 #'   \item{`"cindex_rmlt"`}{A C-index based on the restricted mean lifetime
 #'     (RMLT), computed by first integrating each subject's CIF up to
-#'     `rmlt_tau` via trapezoidal integration, then passing the resulting
+#'     `tau` via trapezoidal integration, then passing the resulting
 #'     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
 #'     summary that does not depend on a specific time horizon.}
 #'
@@ -103,14 +102,12 @@ compute_metrics <- function(cr, eval_times,
                             cif           = NULL,
                             fit           = NULL,
                             cif_time_grid = NULL,
-                            metrics       = c("Brier", "tdAUC"),
-                            cens.method   = "ipcw",
-                            cens.model    = "km",
-                            cens.code     = 0,
-                            se.fit        = FALSE,
-                            rmlt_tau       = NULL,
-                            collapse_as_df = TRUE,
+                            metrics       = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
+                            cens_method_rr   = "ipcw",
+                            cens_model_rr    = "km",
+                            se_fit_rr        = FALSE,
                             tau            = NULL,
+                            collapse_as_df = TRUE,
                             ...) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
@@ -131,23 +128,30 @@ compute_metrics <- function(cr, eval_times,
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
-  idx_nms   <- paste0("cause_", causes)
+  cause_nms   <- paste0("cause_", causes)
   
-  d  <- dim(cif)
-  n  <- d[1]; Tm <- d[3]
+  Tm <- dim(cif)[3]
   
+  # Build a Hist() formula for pec::cindex(); environment must be set to
+  # prodlim so that Hist() resolves correctly inside riskRegression/pec calls.
   f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
   environment(f) <- asNamespace("prodlim")
   
   comp_brier <- "Brier"          %in% metrics
   comp_ibs   <- "IBS"            %in% metrics
   comp_auc   <- "tdAUC"          %in% metrics
-  comp_pec   <- "cindex_t_year"  %in% metrics
-  comp_rmlt  <- "cindex_rmlt"    %in% metrics
+  comp_cidx_t   <- "cindex_t_year"  %in% metrics
+  if (comp_cidx_t)
+    warning(
+      "`cindex_t_year` is not recommended: the C-index is not a proper metric ",
+      "for t-year predictions. Consider `cindex_rmlt` instead.",
+      call. = FALSE
+    )
+  comp_cidx_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
   
-  if (is.null(tau) && (comp_pec || comp_rmlt)) {
-    tau <- max(cr@data[[time_var]][cr@data[[event_var]] != 0])
+  if (is.null(tau) && (comp_cidx_t || comp_cidx_rmlt)) {
+    tau <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
     warning(
       "`tau` not supplied; defaulting to the maximum observed event time (",
       round(tau, 4), "). This affects C-index estimates (`cindex_t_year` and ",
@@ -168,27 +172,23 @@ compute_metrics <- function(cr, eval_times,
   rr_summary <- if (comp_ibs) "ibs" else character(0)
   
   named_list <- function(cond)
-    if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
+    if (cond) stats::setNames(vector("list", length(causes)), cause_nms) else NULL
   
   Brier          <- named_list(comp_brier)
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
-  cindex_t_year  <- named_list(comp_pec)
-  cindex_rmlt    <- named_list(comp_rmlt)
+  cindex_t_year  <- named_list(comp_cidx_t)
+  cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
-  
-  if (comp_rmlt) {
-    tau  <- if (!is.null(rmlt_tau)) rmlt_tau else max(eval_times)
+  if (comp_cidx_rmlt) {
     rmlt <- compute_rmlt_from_cif(cif, eval_times, tau = tau)
   }
   
   for (k in causes) {
     i      <- which(causes == k)
-    nm     <- idx_nms[i]
-    M      <- cif[, i, , drop = FALSE]
-    dim(M) <- c(n, Tm)
-    k_name <- paste0("cif_cause_", k)
-    preds  <- stats::setNames(list(M), k_name)
+    nm     <- cause_nms[i]
+    M      <- cif[, i, , drop = TRUE]
+    preds  <- stats::setNames(list(M), nm)
     
     if (length(rr_metrics) > 0) {
       sc   <- riskRegression::Score(
@@ -199,26 +199,23 @@ compute_metrics <- function(cr, eval_times,
         summary     = rr_summary,
         times       = eval_times,
         cause       = k,
-        cens.method = cens.method,
-        cens.model  = cens.model,
-        se.fit      = se.fit,
+        cens.method = cens_method_rr,
+        cens.model  = cens_model_rr,
+        se.fit      = se_fit_rr,
         null.model  = FALSE,
         ...
       )
-      rows <- sc$Brier$score$model == k_name
-      if (comp_brier) Brier[[nm]] <- sc$Brier$score[rows, ][["Brier"]]
-      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[rows, ][["IBS"]]
-      if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[
-        sc$AUC$score$model == k_name, ][["AUC"]]
+      if (comp_brier) Brier[[nm]] <- sc$Brier$score[["Brier"]]
+      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[["IBS"]]
+      if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[["AUC"]]
     }
     
-    if (comp_pec) {
-      pec_eval_times <- if (length(eval_times) > 1) rep(tau, length(eval_times)) else tau
+    if (comp_cidx_t) {
       cidx <- pec::cindex(
         object      = preds,
         formula     = f,
         data        = cr@data,
-        eval.times  = pec_eval_times,
+        eval.times  = rep(tau, length(eval_times)),
         pred.times  = eval_times,
         cause       = k,
         cens.model  = "marginal",
@@ -226,14 +223,13 @@ compute_metrics <- function(cr, eval_times,
         verbose     = FALSE,
         ...
       )
-      cindex_t_year[[nm]] <- cidx$AppCindex[[k_name]]
+      cindex_t_year[[nm]] <- cidx$AppCindex[[nm]]
     }
     
-    if (comp_rmlt) {
-      k_name_rmlt <- paste0("cause_", k)
+    if (comp_cidx_rmlt) {
       pred_mat    <- as.matrix(rmlt[, i])
       colnames(pred_mat) <- paste0("times_", max(eval_times))
-      preds_rmlt  <- stats::setNames(list(pred_mat), k_name_rmlt)
+      preds_rmlt  <- stats::setNames(list(pred_mat), nm)
       cidx_rmlt   <- pec::cindex(
         object      = preds_rmlt,
         formula     = f,
@@ -245,7 +241,7 @@ compute_metrics <- function(cr, eval_times,
         verbose     = FALSE,
         ...
       )
-      cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[k_name_rmlt]]
+      cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
     
     if (comp_calib) {
@@ -256,7 +252,7 @@ compute_metrics <- function(cr, eval_times,
         status           = cr@data[[event_var]],
         tau              = eval_times,
         cause            = k,
-        cens.code        = cens.code,
+        cens.code        = cr@cens_code,
         predictions.type = "CIF",
         loess_smoothing  = TRUE,
         graph            = FALSE
@@ -271,7 +267,8 @@ compute_metrics <- function(cr, eval_times,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
     cindex_rmlt    = cindex_rmlt,
-    calib_measures = calib_measures
+    calib_measures = calib_measures,
+    rmlt           = if (comp_cidx_rmlt) rmlt else NULL
   ))
   
   if (!collapse_as_df) return(result)
@@ -280,7 +277,9 @@ compute_metrics <- function(cr, eval_times,
   
   lapply(names(result), function(metric_nm) {
     lst <- result[[metric_nm]]
-    if (metric_nm == "cindex_rmlt") {
+    if (metric_nm == "rmlt") {
+      lst  # matrix [n, K], return as-is
+    } else if (metric_nm == "cindex_rmlt") {
       # cindex_rmlt is scalar per cause -> one-column data frame
       vals <- vapply(lst, function(x) x[[1]], numeric(1))
       df   <- data.frame(value = vals, row.names = names(lst))
