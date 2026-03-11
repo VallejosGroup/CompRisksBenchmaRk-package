@@ -64,6 +64,7 @@ Collate:
     'cv_splits.R'
     'imputation.R'
     'cif_io.R'
+    'compute_rmlt.R'
     'scoring.R'
     'metrics.R'
     'compute_metrics.R'    'nested_cv.R'
