@@ -92,7 +92,7 @@ get_cr_model("FGR")$info()
 ### Registering a custom model
 
 Any model whose `fit` accepts a `cr_data` object and whose
-`predict_cif` returns a `[n, K, Tm]` array can be registered.
+`predict_cif` returns a list with `$cif` (`[n, K, Tm]` array) and `$time_grid` can be registered.
 
 ```{r custom-model, eval = FALSE}
 register_cr_model(
@@ -147,12 +147,13 @@ cif_RSF  <- predict_cif(fit_RSF,  newdata = cr, time_grid = time_grid)
 fit_FGRP <- fit_cr_model("FGRP", cr, args = list(lambda_seq = 0.01))
 cif_FGRP <- predict_cif(fit_FGRP, newdata = cr, time_grid = time_grid)
 
-# Collect for downstream use; all arrays: n x 2 causes x 10 time points
+# Collect for downstream use
 model_keys <- c("FGR", "csCPH", "RSF", "FGRP")
 fits <- list(FGR = fit_FGR, csCPH = fit_csCPH, RSF = fit_RSF, FGRP = fit_FGRP)
 cifs <- list(FGR = cif_FGR, csCPH = cif_csCPH, RSF = cif_RSF, FGRP = cif_FGRP)
 
-sapply(cifs, dim)
+# Each element is a list with $cif [n x K x Tm] and $time_grid
+sapply(cifs, function(x) dim(x$cif))
 ```
 
 The explicit calls above make it straightforward to inspect or debug any
@@ -177,10 +178,10 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR,   tau = tau)
-scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH, tau = tau)
-scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF,   tau = tau)
-scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP,  tau = tau)
+scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR$cif,   tau = tau)
+scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH$cif, tau = tau)
+scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF$cif,   tau = tau)
+scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP$cif,  tau = tau)
 
 # Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
 scores_FGR$IBS
@@ -190,8 +191,8 @@ scores_FGR$Brier
 For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
-scores <- lapply(cifs, function(cif)
-  compute_metrics(cr, time_grid, cif = cif, tau = tau)
+scores <- lapply(cifs, function(x)
+  compute_metrics(cr, time_grid, cif = x$cif, tau = tau)
 )
 
 # Compare IBS for cause 2 across models
@@ -210,7 +211,7 @@ hi      <- which.min(abs(time_grid - horizon))
 cal_list <- lapply(model_keys, function(key) {
   CalibrationPlot(
     model_name       = key,
-    predictions      = cifs[[key]][, 2, hi],
+    predictions      = cifs[[key]]$cif[, 2, hi],
     data             = cr@data,
     time             = cr@data[[cr@time_var]],
     status           = cr@data[[cr@event_var]],
@@ -236,7 +237,7 @@ cal_list$FGR$OE_summary             # O/E ratio with 95% CI for FGR
 # Add each model's 5-year cause-2 predictions as columns for DCA
 test_dca <- cr@data
 for (key in model_keys)
-  test_dca[[paste0("pred_", key)]] <- cifs[[key]][, 2, hi]
+  test_dca[[paste0("pred_", key)]] <- cifs[[key]]$cif[, 2, hi]
 
 pred_cols <- paste0("pred_", model_keys)
 
@@ -324,7 +325,7 @@ cif_list <- lapply(seq_len(imp$m), function(k) {
                   event_var = cr@event_var)
   fit_k <- fit_cr_model("FGR", cr_k)
   cr_te_k <- cr_data(te_k, time_var = cr@time_var, event_var = cr@event_var)
-  predict_cif(fit_k, newdata = cr_te_k, time_grid = time_grid)
+  predict_cif(fit_k, newdata = cr_te_k, time_grid = time_grid)$cif
 })
 
 cif_pooled <- pool_cifs_mean(cif_list)

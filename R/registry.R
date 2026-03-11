@@ -94,20 +94,29 @@ get_cr_model <- function(key) {
 #' @param newdata A [cr_data()] object of new observations.
 #' @param time_grid Numeric vector of evaluation times.
 #'
-#' @return A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.
+#' @return A named list with elements:
+#'   \describe{
+#'     \item{`cif`}{A 3-D numeric array of dimensions `[n, K, length(time_grid)]`.}
+#'     \item{`time_grid`}{The numeric vector of evaluation times used.}
+#'   }
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' fit <- fit_cr_model("FGR", cr)
-#' cif <- predict_cif(fit, newdata = cr, time_grid = time_grid)
+#' fit    <- fit_cr_model("FGR", cr)
+#' result <- predict_cif(fit, newdata = cr, time_grid = time_grid)
+#' result$cif       # [n, K, Tm] array
+#' result$time_grid # evaluation times
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {
   if (!methods::is(newdata, "cr_data"))
     stop("`newdata` must be a cr_data object.", call. = FALSE)
   mdl       <- get_cr_model(fit_obj$model_key)
   time_grid <- as.numeric(time_grid)
-  mdl$predict_cif(fit_obj, newdata, time_grid)
+  list(
+    cif       = mdl$predict_cif(fit_obj, newdata, time_grid),
+    time_grid = time_grid
+  )
 }
 
 

@@ -5,19 +5,6 @@
 NULL
 
 
-#' Trapezoidal numerical integration
-#'
-#' @param x Numeric vector of x-values (must be sorted).
-#' @param y Numeric vector of y-values (same length as `x`).
-#'
-#' @return A single numeric value.
-#' @export
-trapezoidal.integration <- function(x, y) {
-  if (length(x) != length(y))
-    stop("`x` and `y` must have the same length.")
-  sum(diff(x) * (utils::head(y, -1) + utils::tail(y, -1)) / 2)
-}
-
 
 #' Extract penalised Fine-Gray regression coefficients
 #'
@@ -176,8 +163,8 @@ get_results <- function(data_root,
       all_cifs[[model]][[v]] <- out
       all_test[[v]]          <- df_test
 
-      all_rmlt[[model]][[v]] <- compute_rmlt(out, times,
-                                                      tau = max(times))
+      all_rmlt[[model]][[v]] <- compute_rmlt(cr_test, times,
+                                             cif = out, tau = max(times))
       res_rmlt[[model]][[v]] <- compute_metrics(
         cr             = cr_test,
         eval_times     = max(times),

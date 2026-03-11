@@ -121,7 +121,7 @@ IntegratedBrierScore <- function(prediction_matrix,
 
   t_max <- max(taus)
   t_min <- min(taus)
-  ibs   <- trapezoidal.integration(taus, bs) / (t_max - t_min)
+  ibs   <- .trapezoidal_integration(taus, bs) / (t_max - t_min)
 
   list(integrated.brier.score = ibs,
        average.brier.score    = mean(bs),

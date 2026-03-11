@@ -144,7 +144,7 @@ compute_metrics <- function(cr, eval_times,
   if (!is.null(fit)) {
     if (is.null(cif_time_grid))
       stop("`cif_time_grid` must be provided when `fit` is non-NULL.", call. = FALSE)
-    cif <- predict_cif(fit, newdata = cr, time_grid = cif_time_grid)
+    cif <- predict_cif(fit, newdata = cr, time_grid = cif_time_grid)$cif
   }
 
   time_var  <- cr@time_var
@@ -200,7 +200,7 @@ compute_metrics <- function(cr, eval_times,
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
   if (comp_cidx_rmlt) {
-    rmlt <- compute_rmlt(cif, eval_times, tau = tau)
+    rmlt <- compute_rmlt(cr, eval_times, cif = cif, tau = tau)
   }
 
   for (k in causes) {
