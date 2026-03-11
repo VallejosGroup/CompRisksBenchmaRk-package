@@ -16,7 +16,7 @@ summarize_out_of_sample(results, num_causes, times)
 }
 \value{
 A data frame with one row per model × fold × cause × time,
-  containing Brier score, IBS, AUC, C-index (pec), C-index (survMetrics),
+  containing Brier score, IBS, AUC, C-index (pec),
   and calibration measures.
 }
 \description{

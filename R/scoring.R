@@ -268,7 +268,7 @@ get_results <- function(data_root,
 #' @param times Numeric vector of evaluation time points.
 #'
 #' @return A data frame with one row per model × fold × cause × time,
-#'   containing Brier score, IBS, AUC, C-index (pec), C-index (survMetrics),
+#'   containing Brier score, IBS, AUC, C-index (pec),
 #'   and calibration measures.
 #' @export
 summarize_out_of_sample <- function(results, num_causes, times) {
@@ -287,14 +287,10 @@ summarize_out_of_sample <- function(results, num_causes, times) {
         if (!is.null(x)) x else array(NA_real_, len)
 
       for (cause in seq_len(causes)) {
-        bs         <- get_or_na(res_fold$Brier[[cause]],          length(times))
-        ibs        <- get_or_na(res_fold$IBS[[cause]],         length(times))
+        bs         <- get_or_na(res_fold$Brier[[cause]],         length(times))
+        ibs        <- get_or_na(res_fold$IBS[[cause]],           length(times))
         auc        <- get_or_na(res_fold$tdAUC[[cause]],         length(times))
-        cidx_pec   <- get_or_na(res_fold$cindex_t_year[[cause]],  length(times))
-        cidx_survM <- if (!is.null(res_fold$cindex_survM[[cause]]))
-          res_fold$cindex_survM[[cause]]
-        else
-          list(rep(NA_real_, length(times)), rep(NA_real_, length(times)))
+        cidx_pec   <- get_or_na(res_fold$cindex_t_year[[cause]], length(times))
         calib_meas <- if (!is.null(res_fold$calib_measures[[cause]]))
           res_fold$calib_measures[[cause]]
         else
@@ -309,8 +305,6 @@ summarize_out_of_sample <- function(results, num_causes, times) {
           ibs        = ibs,
           auc        = auc,
           cidx_pec   = cidx_pec,
-          cidx_survM = cidx_survM[[1]],
-          survM_eval = cidx_survM[[2]],
           ICI        = calib_meas[["ICI"]],
           E50        = calib_meas[["E50"]],
           E90        = calib_meas[["E90"]],
@@ -351,8 +345,6 @@ aggregate_out_of_sample <- function(df, metrics) {
   }
   out <- lapply(metrics, function(m) data.frame(agg_one(m)))
   names(out) <- metrics
-  if ("cidx_survM" %in% metrics)
-    out[["survM_eval"]] <- agg_one("survM_eval")
   out
 }
 
@@ -371,7 +363,7 @@ aggregate_out_of_sample <- function(df, metrics) {
 #' @export
 plot_out_of_sample <- function(agg,
                                 metrics  = c("bs", "ibs", "auc",
-                                             "cidx_pec", "cidx_survM",
+                                             "cidx_pec",
                                              "ICI", "E50", "E90",
                                              "Emax", "RSB"),
                                 cause    = NULL,
@@ -381,16 +373,10 @@ plot_out_of_sample <- function(agg,
     df     <- agg[[metric]]
     if (!is.null(cause)) df <- df[df$cause == cause, , drop = FALSE]
 
-    tau <- tau_min <- tau_max <- tau_med <- tau_mu <- NULL
+    tau <- NULL
 
-    if (metric == "cidx_survM" && !is.null(agg$survM_eval)) {
-      tau_df  <- agg$survM_eval
-      tau_min <- min(tau_df$x[, "lwr"],    na.rm = TRUE)
-      tau_max <- max(tau_df$x[, "upr"],    na.rm = TRUE)
-      tau_med <- unique(tau_df$x[, "median"])
-      tau_mu  <- unique(tau_df$x[, "mean"])
-    } else if (metric %in% c("bs", "auc", "cidx_pec",
-                              "ICI", "E50", "E90", "Emax", "RSB")) {
+    if (metric %in% c("bs", "auc", "cidx_pec",
+                       "ICI", "E50", "E90", "Emax", "RSB")) {
       tau <- df$time
       if (length(unique(tau)) == 1 && metric == "cidx_pec") {
         df$model <- factor(df$model, levels = unique(df$model))
@@ -429,13 +415,6 @@ plot_out_of_sample <- function(agg,
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::theme(legend.position = "top")
 
-    if (plot_tau && metric == "cidx_survM" &&
-        !is.null(tau_min) && !is.null(tau_max)) {
-      p <- p + ggplot2::annotate("rect",
-                                  xmin = tau_min, xmax = tau_max,
-                                  ymin = -Inf, ymax = Inf,
-                                  fill = "grey90", alpha = 0.05)
-    }
     if (plot_tau && metric %in% c("bs", "auc", "cidx_pec",
                                    "ICI", "E50", "E90", "Emax", "RSB") &&
         !is.null(tau)) {

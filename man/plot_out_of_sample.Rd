@@ -6,8 +6,7 @@
 \usage{
 plot_out_of_sample(
   agg,
-  metrics = c("bs", "ibs", "auc", "cidx_pec", "cidx_survM", "ICI", "E50", "E90", "Emax",
-    "RSB"),
+  metrics = c("bs", "ibs", "auc", "cidx_pec", "ICI", "E50", "E90", "Emax", "RSB"),
   cause = NULL,
   plot_tau = TRUE
 )

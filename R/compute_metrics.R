@@ -24,7 +24,6 @@
 #'   `"IBS"` (integrated Brier score),
 #'   `"tdAUC"` (time-dependent AUC),
 #'   `"cindex_t_year"` (C-index via \pkg{pec}),
-#'   `"cindex_survM"` (C-index via SurvM),
 #'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
 #'   `"calib_measures"` (calibration summary statistics).
 #'   Note: requesting `"IBS"` implicitly also computes `"Brier"`.
@@ -40,6 +39,13 @@
 #' @param rmlt_tau    Upper integration limit for the restricted mean lifetime
 #'   (default `NULL`, which uses `max(eval_times)`); relevant only for
 #'   `"cindex_rmlt"`.
+#' @param collapse_as_df Logical; if `TRUE`, each metric element in the output
+#'   list is collapsed into a data frame with one row per cause (default
+#'   `FALSE`).  For time-varying metrics (`"Brier"`, `"tdAUC"`,
+#'   `"cindex_t_year"`), columns correspond to `eval_times`.  For scalar
+#'   metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
+#'   For `"calib_measures"`, columns are the calibration statistics, with one
+#'   row per cause per evaluation time and an additional `time` column.
 #'
 #' @details
 #' The following metrics are supported, computed separately for each competing
@@ -67,10 +73,6 @@
 #'     discrimination across the entire follow-up rather than at a specific
 #'     time point.}
 #'
-#'   \item{`"cindex_survM"`}{A cause-specific C-index computed via an internal
-#'     `CindexCR()` routine.  Evaluated at each time in `eval_times` and
-#'     returned together with the corresponding evaluation time points.}
-#'
 #'   \item{`"cindex_rmlt"`}{A C-index based on the restricted mean lifetime
 #'     (RMLT), computed by first integrating each subject's CIF up to
 #'     `rmlt_tau` via trapezoidal integration, then passing the resulting
@@ -83,10 +85,10 @@
 #'     event fractions at each evaluation time.}
 #' }
 #'
-#' @return A named list; elements present depend on the requested metrics:
-#'   `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `cindex_rmlt`,
-#'   `calib_measures`.  Each element is itself a named list with one entry per
-#'   cause (e.g. `$Brier$cause_1`, `$Brier$cause_2`).
+#' @return When `collapse_as_df = FALSE` (default), a named list with one
+#'   element per requested metric, each itself a named list with one entry per
+#'   cause.  When `collapse_as_df = TRUE`, each metric element is a data frame
+#'   with one row per cause.
 #' @export
 compute_metrics <- function(cr, eval_times,
                             cif           = NULL,
@@ -97,7 +99,8 @@ compute_metrics <- function(cr, eval_times,
                             cens.model    = "km",
                             cens.code     = 0,
                             se.fit        = FALSE,
-                            rmlt_tau      = NULL) {
+                            rmlt_tau      = NULL,
+                            collapse_as_df = FALSE) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
 
@@ -129,7 +132,6 @@ compute_metrics <- function(cr, eval_times,
   comp_ibs   <- "IBS"            %in% metrics
   comp_auc   <- "tdAUC"          %in% metrics
   comp_pec   <- "cindex_t_year"  %in% metrics
-  comp_survM <- "cindex_survM"   %in% metrics
   comp_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
 
@@ -150,7 +152,6 @@ compute_metrics <- function(cr, eval_times,
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
   cindex_t_year  <- named_list(comp_pec)
-  cindex_survM   <- named_list(comp_survM)
   cindex_rmlt    <- named_list(comp_rmlt)
   calib_measures <- named_list(comp_calib)
 
@@ -202,19 +203,6 @@ compute_metrics <- function(cr, eval_times,
       cindex_t_year[[nm]] <- cidx$AppCindex[[k_name]]
     }
 
-    if (comp_survM) {
-      res <- lapply(seq_len(ncol(M)), function(j)
-        CindexCR(time      = cr@data[[time_var]],
-                 status    = cr@data[[event_var]],
-                 predicted = 1 - M[, j],
-                 Cause_int = k)
-      )
-      cindex_survM[[nm]] <- list(
-        sapply(res, `[[`, "cindex"),
-        sapply(res, `[[`, "time_ev")
-      )
-    }
-
     if (comp_rmlt) {
       k_name_rmlt <- paste0("cause_", k)
       pred_mat    <- as.matrix(rmlt[, i])
@@ -249,13 +237,38 @@ compute_metrics <- function(cr, eval_times,
     }
   }
 
-  Filter(Negate(is.null), list(
+  result <- Filter(Negate(is.null), list(
     Brier          = Brier,
     IBS            = IBS,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
-    cindex_survM   = cindex_survM,
     cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures
   ))
+
+  if (!collapse_as_df) return(result)
+
+  t_nms <- as.character(eval_times)
+
+  lapply(names(result), function(metric_nm) {
+    lst <- result[[metric_nm]]
+    if (metric_nm %in% c("IBS", "cindex_rmlt")) {
+      # scalar per cause -> one-column data frame
+      df <- data.frame(value = unlist(lst), row.names = names(lst))
+    } else if (metric_nm == "calib_measures") {
+      # per-cause data frames (rows = eval_times) -> rbind with cause column
+      df <- do.call(rbind, lapply(names(lst), function(nm) {
+        cbind(cause = nm, time = eval_times, lst[[nm]])
+      }))
+      rownames(df) <- NULL
+    } else {
+      # vector per cause (length Tm) -> one row per cause, one col per time
+      df <- as.data.frame(
+        do.call(rbind, lst),
+        row.names = names(lst)
+      )
+      colnames(df) <- t_nms
+    }
+    df
+  }) |> stats::setNames(names(result))
 }

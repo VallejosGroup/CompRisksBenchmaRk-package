@@ -15,7 +15,8 @@ compute_metrics(
   cens.model = "km",
   cens.code = 0,
   se.fit = FALSE,
-  rmlt_tau = NULL
+  rmlt_tau = NULL,
+  collapse_as_df = FALSE
 )
 }
 \arguments{
@@ -41,7 +42,6 @@ is supplied; ignored when `cif` is supplied directly.}
 `"IBS"` (integrated Brier score),
 `"tdAUC"` (time-dependent AUC),
 `"cindex_t_year"` (C-index via \pkg{pec}),
-`"cindex_survM"` (C-index via SurvM),
 `"cindex_rmlt"` (C-index via restricted mean lifetime),
 `"calib_measures"` (calibration summary statistics).
 Note: requesting `"IBS"` implicitly also computes `"Brier"`.}
@@ -62,12 +62,20 @@ relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.}
 \item{rmlt_tau}{Upper integration limit for the restricted mean lifetime
 (default `NULL`, which uses `max(eval_times)`); relevant only for
 `"cindex_rmlt"`.}
+
+\item{collapse_as_df}{Logical; if `TRUE`, each metric element in the output
+list is collapsed into a data frame with one row per cause (default
+`FALSE`).  For time-varying metrics (`"Brier"`, `"tdAUC"`,
+`"cindex_t_year"`), columns correspond to `eval_times`.  For scalar
+metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
+For `"calib_measures"`, columns are the calibration statistics, with one
+row per cause per evaluation time and an additional `time` column.}
 }
 \value{
-A named list; elements present depend on the requested metrics:
-  `Brier`, `IBS`, `tdAUC`, `cindex_t_year`, `cindex_survM`, `cindex_rmlt`,
-  `calib_measures`.  Each element is itself a named list with one entry per
-  cause (e.g. `$Brier$cause_1`, `$Brier$cause_2`).
+When `collapse_as_df = FALSE` (default), a named list with one
+  element per requested metric, each itself a named list with one entry per
+  cause.  When `collapse_as_df = TRUE`, each metric element is a data frame
+  with one row per cause.
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
@@ -102,10 +110,6 @@ cause:
     `pec::cindex()` using a marginal censoring model.  Summarises
     discrimination across the entire follow-up rather than at a specific
     time point.}
-
-  \item{`"cindex_survM"`}{A cause-specific C-index computed via an internal
-    `CindexCR()` routine.  Evaluated at each time in `eval_times` and
-    returned together with the corresponding evaluation time points.}
 
   \item{`"cindex_rmlt"`}{A C-index based on the restricted mean lifetime
     (RMLT), computed by first integrating each subject's CIF up to
