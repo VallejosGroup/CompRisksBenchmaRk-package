@@ -6,7 +6,7 @@
 \usage{
 compute_metrics(
   cr,
-  eval_times,
+  eval_times = NULL,
   cif = NULL,
   fit = NULL,
   cif_time_grid = NULL,
@@ -22,7 +22,11 @@ compute_metrics(
 \item{cr}{A [cr_data()] object providing the test-set outcomes, time
 and event variable names, and cause codes.}
 
-\item{eval_times}{Numeric vector of evaluation times for the metrics (length `Tm`).}
+\item{eval_times}{Numeric vector of evaluation times for the metrics (length
+`Tm`). Required when any of `"Brier"`, `"IBS"`, `"tdAUC"`,
+`"cindex_t_year"`, or `"calib_measures"` is requested. Not needed when
+only `"cindex_rmlt"` is requested, as that metric operates on the CIF
+time grid directly.}
 
 \item{cif}{A list as returned by [predict_cif()], with elements
 `$cif` (3-D numeric array `[n, K, Tm]`) and `$time_grid` (numeric vector).
@@ -34,7 +38,8 @@ Mutually exclusive with `cif`.}
 
 \item{cif_time_grid}{Numeric vector of time points passed to [predict_cif()]
 when `fit` is non-`NULL` (default `NULL`).  Must be provided when `fit`
-is supplied; ignored when `cif` is supplied directly.}
+is supplied; must be `NULL` when `cif` is supplied directly (the time grid
+is then taken from `cif$time_grid`).}
 
 \item{metrics}{Character vector of metrics to compute. Supported values:
 `"Brier"` (time-dependent Brier score),

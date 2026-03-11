@@ -9,7 +9,11 @@
 #'
 #' @param cr         A [cr_data()] object providing the test-set outcomes, time
 #'   and event variable names, and cause codes.
-#' @param eval_times Numeric vector of evaluation times for the metrics (length `Tm`).
+#' @param eval_times Numeric vector of evaluation times for the metrics (length
+#'   `Tm`). Required when any of `"Brier"`, `"IBS"`, `"tdAUC"`,
+#'   `"cindex_t_year"`, or `"calib_measures"` is requested. Not needed when
+#'   only `"cindex_rmlt"` is requested, as that metric operates on the CIF
+#'   time grid directly.
 #' @param cif        A list as returned by [predict_cif()], with elements
 #'   `$cif` (3-D numeric array `[n, K, Tm]`) and `$time_grid` (numeric vector).
 #'   Mutually exclusive with `fit`.
@@ -18,7 +22,8 @@
 #'   Mutually exclusive with `cif`.
 #' @param cif_time_grid Numeric vector of time points passed to [predict_cif()]
 #'   when `fit` is non-`NULL` (default `NULL`).  Must be provided when `fit`
-#'   is supplied; ignored when `cif` is supplied directly.
+#'   is supplied; must be `NULL` when `cif` is supplied directly (the time grid
+#'   is then taken from `cif$time_grid`).
 #' @param metrics    Character vector of metrics to compute. Supported values:
 #'   `"Brier"` (time-dependent Brier score),
 #'   `"IBS"` (integrated Brier score),
@@ -98,7 +103,7 @@
 #'   list with one element per requested metric, each itself a named list with
 #'   one entry per cause.
 #' @export
-compute_metrics <- function(cr, eval_times,
+compute_metrics <- function(cr, eval_times = NULL,
                             cif           = NULL,
                             fit           = NULL,
                             cif_time_grid = NULL,
@@ -125,12 +130,21 @@ compute_metrics <- function(cr, eval_times,
       paste(valid_metrics, collapse = ", ")
     ), call. = FALSE)
   
-  if (!is.numeric(eval_times) || length(eval_times) == 0)
-    stop("`eval_times` must be a non-empty numeric vector.", call. = FALSE)
-  if (anyNA(eval_times))
-    stop("`eval_times` must not contain NA values.", call. = FALSE)
-  if (is.unsorted(eval_times))
-    stop("`eval_times` must be sorted in ascending order.", call. = FALSE)
+  needs_eval_times <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
+                            "calib_measures") %in% metrics)
+  if (needs_eval_times && is.null(eval_times))
+    stop(
+      '`eval_times` must be provided when any of "Brier", "IBS", "tdAUC", ',
+      '"cindex_t_year", or "calib_measures" is requested.', call. = FALSE
+    )
+  if (!is.null(eval_times)) {
+    if (!is.numeric(eval_times) || length(eval_times) == 0)
+      stop("`eval_times` must be a non-empty numeric vector.", call. = FALSE)
+    if (anyNA(eval_times))
+      stop("`eval_times` must not contain NA values.", call. = FALSE)
+    if (is.unsorted(eval_times))
+      stop("`eval_times` must be sorted in ascending order.", call. = FALSE)
+  }
   
   if (!is.null(tau)) {
     if (!is.numeric(tau) || length(tau) != 1 || is.na(tau) || tau <= 0)
@@ -143,6 +157,9 @@ compute_metrics <- function(cr, eval_times,
   if (!is.null(cif) && !is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are non-NULL.",
          call. = FALSE)
+  if (!is.null(cif) && !is.null(cif_time_grid))
+    stop("`cif_time_grid` must be NULL when `cif` is supplied directly.",
+         call. = FALSE)
   
   if (!is.null(fit)) {
     if (is.null(cif_time_grid))
@@ -151,7 +168,8 @@ compute_metrics <- function(cr, eval_times,
   }
   
   # cif is a list(cif = [n,K,Tm] array, time_grid = numeric vector)
-  cif <- cif$cif
+  cif_time_grid <- cif$time_grid
+  cif           <- cif$cif
   
   # Merge user-supplied args over defaults
   rr_args   <- modifyList(
@@ -219,7 +237,7 @@ compute_metrics <- function(cr, eval_times,
   if (comp_cidx_rmlt) {
     rmlt <- do.call(compute_rmlt, c(
       list(cr  = cr,
-           cif = list(cif = cif, time_grid = eval_times)),
+           cif = list(cif = cif, time_grid = cif_time_grid)),
       rmlt_args
     ))
   }

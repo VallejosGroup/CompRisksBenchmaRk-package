@@ -157,7 +157,6 @@ get_results <- function(data_root,
         eval_times     = times,
         cif            = cif_out,
         metrics        = c("Brier", "IBS", "tdAUC", "calib_measures"),
-        args_riskRegression = list(cens.method = "ipcw", cens.model = "km"),
         collapse_as_df = FALSE
       )
 
@@ -169,7 +168,6 @@ get_results <- function(data_root,
                                              maxT = max(times))
       res_rmlt[[model]][[v]] <- compute_metrics(
         cr             = cr_test,
-        eval_times     = max(times),
         cif            = cif_out,
         metrics        = "cindex_rmlt",
         collapse_as_df = FALSE
