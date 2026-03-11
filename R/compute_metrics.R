@@ -112,6 +112,28 @@ compute_metrics <- function(cr, eval_times,
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
   
+  valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
+                     "cindex_rmlt", "calib_measures")
+  bad_metrics <- setdiff(metrics, valid_metrics)
+  if (length(bad_metrics) > 0)
+    stop(sprintf(
+      "Unrecognised metric(s): %s. Valid options are: %s.",
+      paste(bad_metrics, collapse = ", "),
+      paste(valid_metrics, collapse = ", ")
+    ), call. = FALSE)
+  
+  if (!is.numeric(eval_times) || length(eval_times) == 0)
+    stop("`eval_times` must be a non-empty numeric vector.", call. = FALSE)
+  if (anyNA(eval_times))
+    stop("`eval_times` must not contain NA values.", call. = FALSE)
+  if (is.unsorted(eval_times))
+    stop("`eval_times` must be sorted in ascending order.", call. = FALSE)
+  
+  if (!is.null(tau)) {
+    if (!is.numeric(tau) || length(tau) != 1 || is.na(tau) || tau <= 0)
+      stop("`tau` must be a single positive numeric value.", call. = FALSE)
+  }
+  
   if (is.null(cif) && is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are NULL.",
          call. = FALSE)
@@ -130,7 +152,6 @@ compute_metrics <- function(cr, eval_times,
   causes    <- cr@causes
   cause_nms   <- paste0("cause_", causes)
   
-  Tm <- dim(cif)[3]
   
   # Build a Hist() formula for pec::cindex(); environment must be set to
   # prodlim so that Hist() resolves correctly inside riskRegression/pec calls.
@@ -180,7 +201,6 @@ compute_metrics <- function(cr, eval_times,
   cindex_t_year  <- named_list(comp_cidx_t)
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
-  rmlt           <- NULL
   if (comp_cidx_rmlt) {
     rmlt <- compute_rmlt_from_cif(cif, eval_times, tau = tau)
   }
@@ -228,9 +248,9 @@ compute_metrics <- function(cr, eval_times,
     }
     
     if (comp_cidx_rmlt) {
-      pred_mat    <- as.matrix(rmlt[, i])
-      colnames(pred_mat) <- paste0("times_", max(eval_times))
-      preds_rmlt  <- stats::setNames(list(pred_mat), nm)
+      preds_rmlt          <- as.matrix(rmlt[, i])
+      colnames(preds_rmlt) <- nm
+      preds_rmlt           <- stats::setNames(list(preds_rmlt), nm)
       cidx_rmlt   <- pec::cindex(
         object      = preds_rmlt,
         formula     = f,
@@ -268,8 +288,7 @@ compute_metrics <- function(cr, eval_times,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
     cindex_rmlt    = cindex_rmlt,
-    calib_measures = calib_measures,
-    rmlt           = rmlt
+    calib_measures = calib_measures
   ))
   
   if (!collapse_as_df) return(result)
@@ -278,9 +297,7 @@ compute_metrics <- function(cr, eval_times,
   
   lapply(names(result), function(metric_nm) {
     lst <- result[[metric_nm]]
-    if (metric_nm == "rmlt") {
-      df <- lst  # matrix [n, K], return as-is
-    } else if (metric_nm == "cindex_rmlt") {
+    if (metric_nm == "cindex_rmlt") {
       # cindex_rmlt is scalar per cause -> one-column data frame
       vals <- vapply(lst, function(x) x[[1]], numeric(1))
       df   <- data.frame(value = vals, row.names = names(lst))
