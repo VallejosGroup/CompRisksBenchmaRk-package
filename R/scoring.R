@@ -197,12 +197,13 @@ get_results <- function(data_root,
       cr_test <- cr_data(df_test, time_var = "time", event_var = "event")
 
       res[[model]][[v]] <- compute_metrics(
-        cr         = cr_test,
-        eval_times = times,
-        cif        = out,
-        metrics    = c("Brier", "IBS", "tdAUC", "calib_measures"),
-        cens.method = "ipcw",
-        cens.model  = "km"
+        cr             = cr_test,
+        eval_times     = times,
+        cif            = out,
+        metrics        = c("Brier", "IBS", "tdAUC", "calib_measures"),
+        cens.method    = "ipcw",
+        cens.model     = "km",
+        collapse_as_df = FALSE
       )
 
       all_cifs[[model]][[v]] <- out
@@ -211,10 +212,11 @@ get_results <- function(data_root,
       all_rmlt[[model]][[v]] <- compute_rmlt_from_cif(out, times,
                                                       tau = max(times))
       res_rmlt[[model]][[v]] <- compute_metrics(
-        cr         = cr_test,
-        eval_times = max(times),
-        cif        = out,
-        metrics    = "cindex_rmlt"
+        cr             = cr_test,
+        eval_times     = max(times),
+        cif            = out,
+        metrics        = "cindex_rmlt",
+        collapse_as_df = FALSE
       )
     }
 

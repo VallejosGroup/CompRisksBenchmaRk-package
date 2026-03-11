@@ -39,9 +39,8 @@
 #' @param rmlt_tau    Upper integration limit for the restricted mean lifetime
 #'   (default `NULL`, which uses `max(eval_times)`); relevant only for
 #'   `"cindex_rmlt"`.
-#' @param collapse_as_df Logical; if `TRUE`, each metric element in the output
-#'   list is collapsed into a data frame with one row per cause (default
-#'   `FALSE`).  For time-varying metrics (`"Brier"`, `"tdAUC"`,
+#' @param collapse_as_df Logical; if `TRUE` (default), each metric element in
+#'   the output list is collapsed into a data frame with one row per cause.  For time-varying metrics (`"Brier"`, `"tdAUC"`,
 #'   `"cindex_t_year"`), columns correspond to `eval_times`.  For scalar
 #'   metrics (`"IBS"`, `"cindex_rmlt"`), a single `value` column is used.
 #'   For `"calib_measures"`, columns are the calibration statistics, with one
@@ -85,10 +84,10 @@
 #'     event fractions at each evaluation time.}
 #' }
 #'
-#' @return When `collapse_as_df = FALSE` (default), a named list with one
-#'   element per requested metric, each itself a named list with one entry per
-#'   cause.  When `collapse_as_df = TRUE`, each metric element is a data frame
-#'   with one row per cause.
+#' @return When `collapse_as_df = TRUE` (default), each metric element is a
+#'   data frame with one row per cause.  When `collapse_as_df = FALSE`, a named
+#'   list with one element per requested metric, each itself a named list with
+#'   one entry per cause.
 #' @export
 compute_metrics <- function(cr, eval_times,
                             cif           = NULL,
@@ -100,41 +99,41 @@ compute_metrics <- function(cr, eval_times,
                             cens.code     = 0,
                             se.fit        = FALSE,
                             rmlt_tau      = NULL,
-                            collapse_as_df = FALSE) {
+                            collapse_as_df = TRUE) {
   if (!methods::is(cr, "cr_data"))
     stop("`cr` must be a cr_data object.", call. = FALSE)
-
+  
   if (is.null(cif) && is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are NULL.",
          call. = FALSE)
   if (!is.null(cif) && !is.null(fit))
     stop("Exactly one of `cif` or `fit` must be non-NULL; both are non-NULL.",
          call. = FALSE)
-
+  
   if (!is.null(fit)) {
     if (is.null(cif_time_grid))
       stop("`cif_time_grid` must be provided when `fit` is non-NULL.", call. = FALSE)
     cif <- predict_cif(fit, newdata = cr, time_grid = cif_time_grid)
   }
-
+  
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
   idx_nms   <- paste0("cause_", causes)
-
+  
   d  <- dim(cif)
   n  <- d[1]; Tm <- d[3]
-
+  
   f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
   environment(f) <- asNamespace("prodlim")
-
+  
   comp_brier <- "Brier"          %in% metrics
   comp_ibs   <- "IBS"            %in% metrics
   comp_auc   <- "tdAUC"          %in% metrics
   comp_pec   <- "cindex_t_year"  %in% metrics
   comp_rmlt  <- "cindex_rmlt"    %in% metrics
   comp_calib <- "calib_measures" %in% metrics
-
+  
   # IBS requires Brier from riskRegression; always request "brier" when either
   # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
   # expected strings.
@@ -144,22 +143,22 @@ compute_metrics <- function(cr, eval_times,
     if (comp_auc)      "auc"
   )
   rr_summary <- if (comp_ibs) "ibs" else character(0)
-
+  
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), idx_nms) else NULL
-
+  
   Brier          <- named_list(comp_brier)
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
   cindex_t_year  <- named_list(comp_pec)
   cindex_rmlt    <- named_list(comp_rmlt)
   calib_measures <- named_list(comp_calib)
-
+  
   if (comp_rmlt) {
     tau  <- if (!is.null(rmlt_tau)) rmlt_tau else max(eval_times)
     rmlt <- compute_rmlt_from_cif(cif, eval_times, tau = tau)
   }
-
+  
   for (k in causes) {
     i      <- which(causes == k)
     nm     <- idx_nms[i]
@@ -167,7 +166,7 @@ compute_metrics <- function(cr, eval_times,
     dim(M) <- c(n, Tm)
     k_name <- paste0("cif_cause_", k)
     preds  <- stats::setNames(list(M), k_name)
-
+    
     if (length(rr_metrics) > 0) {
       sc   <- riskRegression::Score(
         object      = preds,
@@ -179,15 +178,16 @@ compute_metrics <- function(cr, eval_times,
         cause       = k,
         cens.method = cens.method,
         cens.model  = cens.model,
-        se.fit      = se.fit
+        se.fit      = se.fit,
+        null.model  = FALSE
       )
       rows <- sc$Brier$score$model == k_name
-      if (comp_brier) Brier[[nm]] <- sc$Brier$score[rows, "Brier"]
-      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[rows, "IBS"]
+      if (comp_brier) Brier[[nm]] <- sc$Brier$score[rows, ][["Brier"]]
+      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[rows, ][["IBS"]]
       if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[
-        sc$AUC$score$model == k_name, "AUC"]
+        sc$AUC$score$model == k_name, ][["AUC"]]
     }
-
+    
     if (comp_pec) {
       cidx <- pec::cindex(
         object      = preds,
@@ -202,7 +202,7 @@ compute_metrics <- function(cr, eval_times,
       )
       cindex_t_year[[nm]] <- cidx$AppCindex[[k_name]]
     }
-
+    
     if (comp_rmlt) {
       k_name_rmlt <- paste0("cause_", k)
       pred_mat    <- as.matrix(rmlt[, i])
@@ -219,7 +219,7 @@ compute_metrics <- function(cr, eval_times,
       )
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[k_name_rmlt]]
     }
-
+    
     if (comp_calib) {
       cm <- CalibrationPlot(
         predictions      = M,
@@ -236,7 +236,7 @@ compute_metrics <- function(cr, eval_times,
       calib_measures[[nm]] <- do.call(rbind, Filter(Negate(is.null), cm))
     }
   }
-
+  
   result <- Filter(Negate(is.null), list(
     Brier          = Brier,
     IBS            = IBS,
@@ -245,16 +245,18 @@ compute_metrics <- function(cr, eval_times,
     cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures
   ))
-
+  
   if (!collapse_as_df) return(result)
-
-  t_nms <- as.character(eval_times)
-
+  
+  t_nms <- paste0("eval_times_", seq_along(eval_times))
+  
   lapply(names(result), function(metric_nm) {
     lst <- result[[metric_nm]]
     if (metric_nm %in% c("IBS", "cindex_rmlt")) {
-      # scalar per cause -> one-column data frame
-      df <- data.frame(value = unlist(lst), row.names = names(lst))
+      # IBS is scalar per cause (one integrated value); cindex_rmlt likewise.
+      # Extract the first unique value per cause to guard against repeated rows.
+      vals <- vapply(lst, function(x) x[[1]], numeric(1))
+      df   <- data.frame(value = vals, row.names = names(lst))
     } else if (metric_nm == "calib_measures") {
       # per-cause data frames (rows = eval_times) -> rbind with cause column
       df <- do.call(rbind, lapply(names(lst), function(nm) {
