@@ -59,7 +59,11 @@ BugReports: https://github.com/VallejosGroup/CompRisksBenchmark/issues
 Collate:
     'cr_data.R'
     'utils_registry.R'
-    'registry.R'
+    'register_cr_model.R'
+    'get_cr_model.R'
+    'fit_cr_model.R'
+    'predict_cif.R'
+    'list_cr_models.R'
     'data_prep.R'
     'cv_splits.R'
     'imputation.R'

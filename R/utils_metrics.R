@@ -114,11 +114,11 @@ NULL
 #' @return A list with elements `graphs`, `values`, `calib_measures`,
 #'   `OE_summary` — all for this cause only.
 #' @noRd
-.calibration_one_cause <- function(pred_at_tau, tau, cause, cause_idx,
-                                   cause_nm, model_name,
-                                   time, status, cens_code, cr,
-                                   margFit, loess_smoothing, bandwidth,
-                                   graph) {
+.compute_calibration_per_cause <- function(pred_at_tau, tau, cause, cause_idx,
+                                           cause_nm, model_name,
+                                           time, status, cens_code, cr,
+                                           margFit, loess_smoothing, bandwidth,
+                                           graph) {
   # O/E at the last (or only) horizon
   horizon <- tau[length(tau)]
   obj     <- summary(
@@ -354,7 +354,7 @@ NULL
     cif_at_horizon <- cif_arr[, i, map_horizon_to_grid, drop = FALSE][, 1, , drop = FALSE]
     dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(horizon))
     
-    res <- .calibration_one_cause(
+    res <- .compute_calibration_per_cause(
       pred_at_tau     = cif_at_horizon,
       tau             = horizon,
       cause           = k,
