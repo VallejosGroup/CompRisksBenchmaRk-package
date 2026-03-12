@@ -81,13 +81,18 @@ For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
 columns correspond to `eval_times`.  For scalar metrics (`"IBS"`,
 `"cindex_rmlt"`), a single `value` column is used.  For
 `"calib_measures"`, columns are the calibration statistics, with one row
-per cause per evaluation time and an additional `time` column.}
+per cause per evaluation time and an additional `time` column.
+`calib_graphs` is always returned as a named list regardless of this
+setting.}
 }
 \value{
-When `collapse_as_df = TRUE` (default), each metric element is a
-  data frame with one row per cause.  When `collapse_as_df = FALSE`, a named
-  list with one element per requested metric, each itself a named list with
-  one entry per cause.
+A named list with one element per requested metric.  When
+  `collapse_as_df = TRUE` (default), each element (except `calib_graphs`)
+  is a data frame with one row per cause.  When `collapse_as_df = FALSE`,
+  each element is itself a named list with one entry per cause.
+  `calib_graphs` is always a named list keyed by cause (e.g. `"cause_1"`),
+  each containing a list of ggplot objects — one per element of
+  `eval_times`.
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
@@ -132,6 +137,7 @@ cause:
   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
     Emax, RSB) computed via an internal `.compute_calibration()` routine.
     These quantify agreement between predicted CIF values and observed
-    event fractions at each evaluation time.}
+    event fractions at each evaluation time.  Calibration plots are
+    always returned alongside in `calib_graphs`.}
 }
 }
