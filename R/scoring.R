@@ -190,7 +190,7 @@ get_results <- function(data_root,
     plotFrame <- .compute_calibration(
       cr              = cr_all,
       cif             = cif_all,
-      tau             = horizon_use,
+      horizon         = horizon_use,
       loess_smoothing = TRUE,
       graph           = TRUE
     )

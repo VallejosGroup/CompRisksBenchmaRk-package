@@ -115,10 +115,10 @@ NULL
 #'   `OE_summary` — all for this cause only.
 #' @noRd
 .calibration_one_cause <- function(pred_at_tau, tau, cause, cause_idx,
-                                    cause_nm, model_name,
-                                    time, status, cens_code, cr,
-                                    margFit, loess_smoothing, bandwidth,
-                                    graph) {
+                                   cause_nm, model_name,
+                                   time, status, cens_code, cr,
+                                   margFit, loess_smoothing, bandwidth,
+                                   graph) {
   # O/E at the last (or only) horizon
   horizon <- tau[length(tau)]
   obj     <- summary(
@@ -140,24 +140,24 @@ NULL
   )
   e_txt <- sprintf(", OE = %.3f (CI: %.3f\u2013%.3f)",
                    OE_summary$OE, OE_summary$lower, OE_summary$upper)
-
+  
   plotFrames <- vector("list", length(tau))
   measures   <- vector("list", length(tau))
   graphs     <- vector("list", length(tau))
-
+  
   for (i in seq_along(tau)) {
     prediction <- pred_at_tau[, i]
     eval_time  <- tau[i]
-
+    
     if (length(unique(stats::na.omit(prediction))) <= 1) {
       measures[[i]] <- data.frame(cause = cause_nm, tau = eval_time,
-                                   ICI = NA, E50 = NA, E90 = NA,
-                                   Emax = NA, RSB = NA)
+                                  ICI = NA, E50 = NA, E90 = NA,
+                                  Emax = NA, RSB = NA)
       next
     }
-
+    
     pseudo <- prodlim::jackknife(margFit, cause = cause, times = eval_time)
-
+    
     keep <- !is.na(prediction) & !is.na(pseudo)
     if (sum(keep) < 5) {
       warning(sprintf(
@@ -171,10 +171,10 @@ NULL
     x          <- pred_use
     y          <- pseudo_use
     if (length(unique(x)) < length(x)) x <- jitter(x, factor = 1e-6)
-
+    
     if (!loess_smoothing) {
       bw  <- if (is.null(bandwidth)) prodlim::neighborhood(x)$bandwidth
-              else bandwidth
+      else bandwidth
       nbh <- prodlim::meanNeighbors(x = x, y = y, bandwidth = bw)
       plotFrames[[i]] <- data.frame(pred = nbh$uniqueX, obs = nbh$averageY,
                                     lower = NA_real_, upper = NA_real_)
@@ -184,7 +184,7 @@ NULL
       pseudo_use <- pseudo_use[ord]
       pseu       <- data.frame(risk = pred_use, pseudovalue = pseudo_use)
       fit_loess  <- stats::loess(pseudovalue ~ risk, data = pseu,
-                                  degree = 1, span = 0.3)
+                                 degree = 1, span = 0.3)
       sm         <- stats::predict(fit_loess, se = TRUE)
       plotFrames[[i]] <- data.frame(
         pred  = pseu$risk,
@@ -193,7 +193,7 @@ NULL
         upper = pmin(sm$fit + stats::qt(0.975, sm$df) * sm$se, 1)
       )
     }
-
+    
     error         <- plotFrames[[i]]$pred - plotFrames[[i]]$obs
     measures[[i]] <- data.frame(
       cause = cause_nm,
@@ -205,7 +205,7 @@ NULL
       RSB   = sqrt(mean(error^2, na.rm = TRUE)),
       row.names = NULL
     )
-
+    
     if (graph) {
       df           <- plotFrames[[i]]
       pred_hist    <- prediction[!is.na(prediction)]
@@ -227,11 +227,11 @@ NULL
         spikes_df <- data.frame(x = bins_valid,
                                 y0 = spike_bounds[1], y1 = fr_sc)
       }
-
+      
       p <- ggplot2::ggplot(df, ggplot2::aes(x = pred, y = obs)) +
         ggplot2::geom_line(linewidth = 1) +
         ggplot2::geom_abline(slope = 1, intercept = 0,
-                              linetype = "dashed", colour = "red") +
+                             linetype = "dashed", colour = "red") +
         ggplot2::scale_y_continuous(breaks = seq(0, 0.6, by = 0.1),
                                     limits = c(spike_bounds[1], 0.6)) +
         ggplot2::coord_cartesian(xlim = c(0, x_max), expand = FALSE) +
@@ -242,12 +242,12 @@ NULL
                          " at time ", round(eval_time, 1), e_txt)
         ) +
         ggplot2::theme_minimal()
-
+      
       if (!all(is.na(df$lower)))
         p <- p + ggplot2::geom_ribbon(
           ggplot2::aes(ymin = lower, ymax = upper), alpha = 0.2
         )
-
+      
       if (!is.null(spikes_df))
         p <- p + ggplot2::geom_segment(
           data        = spikes_df,
@@ -257,7 +257,7 @@ NULL
       graphs[[i]] <- p
     }
   }
-
+  
   list(
     graphs         = graphs,
     values         = plotFrames,
@@ -278,8 +278,12 @@ NULL
 #' @param fit           A fitted model object. Mutually exclusive with `cif`.
 #' @param cif_time_grid Numeric time grid; required when `fit` is supplied,
 #'   must be `NULL` when `cif` is supplied.
-#' @param tau           Numeric scalar or vector of evaluation times (sorted,
-#'   no NAs).
+#' @param horizon       Numeric scalar or vector of evaluation times (sorted,
+#'   no NAs).  Each value is mapped to the nearest point on the CIF time grid.
+#' @param tol           Maximum allowable absolute difference between a
+#'   requested `horizon` value and its nearest point on the CIF time grid.
+#'   An error is raised if any mapping exceeds this tolerance (default `Inf`,
+#'   i.e. no check).
 #' @param loess_smoothing Logical; use LOESS smoothing (default `TRUE`).
 #' @param bandwidth     Optional bandwidth for nearest-neighbour smoothing.
 #' @param graph         Logical; produce ggplot objects? (default `TRUE`).
@@ -288,58 +292,71 @@ NULL
 #'   `OE_summary`.
 #' @noRd
 .compute_calibration <- function(cr,
-                                  cif           = NULL,
-                                  fit           = NULL,
-                                  cif_time_grid = NULL,
-                                  tau,
-                                  loess_smoothing = TRUE,
-                                  bandwidth       = NULL,
-                                  graph           = TRUE) {
+                                 cif           = NULL,
+                                 fit           = NULL,
+                                 cif_time_grid = NULL,
+                                 horizon,
+                                 tol             = Inf,
+                                 loess_smoothing = TRUE,
+                                 bandwidth       = NULL,
+                                 graph           = TRUE) {
   .check_cr(cr)
-
-  if (missing(tau) || !is.numeric(tau) || length(tau) == 0)
-    stop("`tau` must be a non-empty numeric vector.", call. = FALSE)
-  if (anyNA(tau) || is.unsorted(tau))
-    stop("`tau` must be sorted and contain no NA values.", call. = FALSE)
-
+  
+  if (missing(horizon) || !is.numeric(horizon) || length(horizon) == 0)
+    stop("`horizon` must be a non-empty numeric vector.", call. = FALSE)
+  if (anyNA(horizon) || is.unsorted(horizon))
+    stop("`horizon` must be sorted and contain no NA values.", call. = FALSE)
+  
   cif_in     <- .resolve_cif(cif, fit, cif_time_grid, cr)
   unpacked   <- .validate_and_unpack_cif(cif_in, cr)
   cif_arr    <- unpacked$cif
   model_name <- unpacked$model_key
-
-  tau <- as.numeric(tau)
-
-  # Snap tau to time_grid once — shared across all causes
-  time_grid <- unpacked$time_grid
-  snap_idx  <- vapply(tau, function(t) which.min(abs(time_grid - t)),
-                      integer(1))
-
+  
+  # Map each horizon value to the nearest point on the CIF time grid.
+  # An error is raised if any difference exceeds `tol`.
+  time_grid          <- unpacked$time_grid
+  map_horizon_to_grid <- vapply(
+    horizon,
+    function(h) which.min(abs(time_grid - h)),
+    integer(1)
+  )
+  diffs <- abs(horizon - time_grid[map_horizon_to_grid])
+  if (any(diffs > tol))
+    stop(sprintf(
+      "horizon value(s) %s are more than tol=%g away from the nearest ",
+      "CIF time grid point (max diff = %g). ",
+      "Adjust `horizon` or increase `tol`.",
+      paste(horizon[diffs > tol], collapse = ", "), tol, max(diffs)
+    ), call. = FALSE)
+  
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
   time      <- cr@data[[cr@time_var]]
   status    <- cr@data[[cr@event_var]]
   cens_code <- cr@cens_code
-
-  # Fit marginal model once — shared across all causes and all tau
+  
+  # Fit marginal model once — shared across all causes and all horizon values
   margForm <- prodlim::Hist(time, status, cens.code = cens_code) ~ 1
   margFit  <- prodlim::prodlim(margForm, data = cr@data)
-
+  
   graphs_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
   values_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
   calib_measures_list <- vector("list", length(causes))
   OE_list             <- vector("list", length(causes))
-
+  
   for (i in seq_along(causes)) {
     k        <- causes[i]
     cause_nm <- cause_nms[i]
-
-    # Slice cause and snap to tau
-    pred_full   <- cif_arr[, i, , drop = TRUE]         # [n, Tm_grid]
-    pred_at_tau <- pred_full[, snap_idx, drop = FALSE]  # [n, length(tau)]
-
+    
+    # Extract predicted CIF for this cause at the mapped horizon indices.
+    # cif_arr is [n, K, Tm]; indexing the K and Tm dims gives [n, 1, length(horizon)],
+    # which is then squeezed to [n, length(horizon)].
+    cif_at_horizon <- cif_arr[, i, map_horizon_to_grid, drop = FALSE][, 1, , drop = FALSE]
+    dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(horizon))
+    
     res <- .calibration_one_cause(
-      pred_at_tau     = pred_at_tau,
-      tau             = tau,
+      pred_at_tau     = cif_at_horizon,
+      tau             = horizon,
       cause           = k,
       cause_idx       = i,
       cause_nm        = cause_nm,
@@ -353,13 +370,13 @@ NULL
       bandwidth       = bandwidth,
       graph           = graph
     )
-
+    
     graphs_out[[cause_nm]]   <- res$graphs
     values_out[[cause_nm]]   <- res$values
     calib_measures_list[[i]] <- res$calib_measures
     OE_list[[i]]             <- res$OE_summary
   }
-
+  
   list(
     graphs         = if (graph) graphs_out else NULL,
     values         = values_out,
