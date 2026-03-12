@@ -44,8 +44,8 @@ feature column.}
 
 \item{\code{event_var}}{Name of the event/status column.}
 
-\item{\code{id_var}}{Name of the subject ID column, or \code{""} if not
-supplied.}
+\item{\code{id_var}}{Name of the subject ID column.  Always set: either the
+user-supplied column name or \code{"id"} for the auto-generated column.}
 
 \item{\code{sort_by_time}}{Logical; whether rows were sorted by ascending time.}
 

@@ -100,6 +100,9 @@ get_cr_model <- function(key) {
 #'     \item{`time_grid`}{The numeric vector of evaluation times used.}
 #'     \item{`model_key`}{The character key of the model that produced the
 #'       predictions, taken from `fit_obj$model_key`.}
+#'     \item{`ids`}{The subject ID vector taken from
+#'       `newdata@data[[newdata@id_var]]`, preserving the row order of
+#'       `newdata`.}
 #'   }
 #' @export
 #'
@@ -110,6 +113,7 @@ get_cr_model <- function(key) {
 #' result$cif       # [n, K, Tm] array
 #' result$time_grid # evaluation times
 #' result$model_key # "FGR"
+#' result$ids       # subject IDs aligned with result$cif rows
 #' }
 predict_cif <- function(fit_obj, newdata, time_grid) {
   if (!methods::is(newdata, "cr_data"))
@@ -119,7 +123,8 @@ predict_cif <- function(fit_obj, newdata, time_grid) {
   list(
     cif       = mdl$predict_cif(fit_obj, newdata, time_grid),
     time_grid = time_grid,
-    model_key = fit_obj$model_key
+    model_key = fit_obj$model_key,
+    ids       = newdata@data[[newdata@id_var]]
   )
 }
 

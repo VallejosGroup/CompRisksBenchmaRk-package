@@ -24,7 +24,10 @@ factor; 0 = censored; no NAs).}
 
 \item{sort_by_time}{Logical; sort rows by ascending time (default \code{TRUE}).}
 
-\item{id_var}{Optional name of the subject ID column.  Not coerced.}
+\item{id_var}{Optional name of the subject ID column.  If \code{NULL}
+(default), a column named \code{"id"} is added automatically using the
+original row numbers before sorting.  An error is raised if \code{"id"}
+already exists in \code{data} and \code{id_var} is not supplied.}
 
 \item{time_offset}{Non-negative numeric offset added to all times when the
 minimum observed time is zero.  Must be \code{> 0} in that case; an

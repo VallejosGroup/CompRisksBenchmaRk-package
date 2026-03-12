@@ -20,6 +20,9 @@ A named list with elements:
     \item{`time_grid`}{The numeric vector of evaluation times used.}
     \item{`model_key`}{The character key of the model that produced the
       predictions, taken from `fit_obj$model_key`.}
+    \item{`ids`}{The subject ID vector taken from
+      `newdata@data[[newdata@id_var]]`, preserving the row order of
+      `newdata`.}
   }
 }
 \description{
@@ -35,5 +38,6 @@ result <- predict_cif(fit, newdata = cr, time_grid = time_grid)
 result$cif       # [n, K, Tm] array
 result$time_grid # evaluation times
 result$model_key # "FGR"
+result$ids       # subject IDs aligned with result$cif rows
 }
 }

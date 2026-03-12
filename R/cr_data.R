@@ -13,8 +13,8 @@
 #'   feature column.
 #' @slot time_var     Name of the time column.
 #' @slot event_var    Name of the event/status column.
-#' @slot id_var       Name of the subject ID column, or \code{""} if not
-#'   supplied.
+#' @slot id_var       Name of the subject ID column.  Always set: either the
+#'   user-supplied column name or \code{"id"} for the auto-generated column.
 #' @slot sort_by_time Logical; whether rows were sorted by ascending time.
 #' @slot time_offset  Numeric offset that was added to times when the minimum
 #'   observed time was zero (0 means no offset was applied).
@@ -50,7 +50,10 @@ methods::setClass("cr_data", representation(
 #' @param event_var   Name of the event/status column (numeric, integer, or
 #'   factor; 0 = censored; no NAs).
 #' @param sort_by_time Logical; sort rows by ascending time (default \code{TRUE}).
-#' @param id_var      Optional name of the subject ID column.  Not coerced.
+#' @param id_var      Optional name of the subject ID column.  If \code{NULL}
+#'   (default), a column named \code{"id"} is added automatically using the
+#'   original row numbers before sorting.  An error is raised if \code{"id"}
+#'   already exists in \code{data} and \code{id_var} is not supplied.
 #' @param time_offset Non-negative numeric offset added to all times when the
 #'   minimum observed time is zero.  Must be \code{> 0} in that case; an
 #'   error is raised when it is \code{0} (the default).
@@ -88,6 +91,16 @@ cr_data <- function(data, time_var, event_var,
       stop(sprintf("`id_var` '%s' not found in `data`.", id_var), call. = FALSE)
     if (any(is.na(data[[id_var]])))
       stop(sprintf("`id_var` '%s' contains NA values.", id_var), call. = FALSE)
+  } else {
+    if ("id" %in% names(data))
+      stop(
+        "Column 'id' already exists in `data`. Either rename it or pass ",
+        "`id_var = 'id'` to use it as the subject identifier.",
+        call. = FALSE
+      )
+    # Capture original row numbers before any sorting
+    data[["id"]] <- seq_len(nrow(data))
+    id_var <- "id"
   }
 
   if (!is.numeric(data[[time_var]]))
@@ -159,7 +172,7 @@ cr_data <- function(data, time_var, event_var,
     covars       = covars,
     time_var     = time_var,
     event_var    = event_var,
-    id_var       = if (!is.null(id_var)) id_var else "",
+    id_var       = id_var,
     sort_by_time = sort_by_time,
     time_offset  = time_offset,
     cens_code    = cens_code
@@ -226,8 +239,7 @@ methods::setMethod("show", "cr_data", function(object) {
   cat(sprintf("  cens_code : %d\n", object@cens_code))
   cat(sprintf("  time_var  : %s\n", object@time_var))
   cat(sprintf("  event_var : %s\n", object@event_var))
-  if (nzchar(object@id_var))
-    cat(sprintf("  id_var    : %s\n", object@id_var))
+  cat(sprintf("  id_var    : %s\n", object@id_var))
   cat(sprintf("  Covariates: %d  [%s]\n",
               nrow(object@covars),
               paste(object@covars$covars_names, collapse = ", ")))
