@@ -53,7 +53,7 @@ NULL
 
   if (is.null(fit_obj)) {
     # --- fit time ---
-    rhs     <- paste(obj@covars$covars_names, collapse = " + ")
+    rhs     <- paste(obj@feature_vars, collapse = " + ")
     formula <- stats::as.formula(paste("~", rhs))
     mf      <- stats::model.frame(formula, data = data, na.action = stats::na.fail)
     tt      <- attr(mf, "terms")

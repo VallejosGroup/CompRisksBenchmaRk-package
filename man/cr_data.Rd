@@ -11,7 +11,11 @@ cr_data(
   sort_by_time = TRUE,
   id_var = NULL,
   time_offset = 0,
-  cens_code = 0L
+  cens_code = 0,
+  store = FALSE,
+  store_dir = NULL,
+  store_name = NULL,
+  store_overwrite = FALSE
 )
 }
 \arguments{
@@ -33,8 +37,26 @@ already exists in \code{data} and \code{id_var} is not supplied.}
 minimum observed time is zero.  Must be \code{> 0} in that case; an
 error is raised when it is \code{0} (the default).}
 
-\item{cens_code}{Integer code denoting censored observations in
-\code{event_var} (default \code{0}).}
+\item{cens_code}{Numeric code denoting censored observations in
+\code{event_var} (default \code{0}).  Coerced to integer internally.}
+
+\item{store}{Logical; if \code{TRUE}, write the constructed object to
+disk as two files: a Parquet file for \code{cr@data} and a JSON file for
+all other slots (metadata).  Requires \code{store_dir} to be supplied
+(default \code{FALSE}).}
+
+\item{store_dir}{Path to an existing directory where files are written.
+Required when \code{store = TRUE}; ignored otherwise.}
+
+\item{store_name}{Optional character string used as a prefix for the
+output file names.  Files are named
+\code{<store_name>_data.parquet} and \code{<store_name>_metadata.json}.
+If \code{NULL} (default), the names \code{cr_data.parquet} and
+\code{cr_metadata.json} are used.}
+
+\item{store_overwrite}{Logical; if \code{FALSE} (default), an error is
+raised when either output file already exists.  Set to \code{TRUE} to
+allow overwriting.}
 }
 \value{
 A \code{cr_data} S4 object.

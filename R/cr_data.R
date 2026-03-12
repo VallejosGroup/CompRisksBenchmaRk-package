@@ -8,9 +8,10 @@
 #'   \code{sort_by_time = TRUE}.
 #' @slot causes       Sorted integer vector of competing cause codes (all
 #'   non-zero values found in \code{event_var}).
-#' @slot covars       A data frame with columns \code{covars_names} and
-#'   \code{covars_types} recording the name and original type of each
-#'   feature column.
+#' @slot feature_vars  Character vector of feature column names.
+#' @slot feature_types Character vector of original column types, parallel
+#'   to \code{feature_vars} (one of \code{"logical"}, \code{"factor"},
+#'   \code{"character"}, \code{"integer"}, \code{"numeric"}).
 #' @slot time_var     Name of the time column.
 #' @slot event_var    Name of the event/status column.
 #' @slot id_var       Name of the subject ID column.  Always set: either the
@@ -19,7 +20,7 @@
 #' @slot time_offset  Numeric offset that was added to times when the minimum
 #'   observed time was zero (0 means no offset was applied).
 #' @slot cens_code    Integer code used to denote censored observations in
-#'   \code{event_var} (default \code{0L}).
+#'   \code{event_var} (default \code{0}).
 #'
 #' @name cr_data-class
 #' @exportClass cr_data
@@ -29,7 +30,8 @@ NULL
 methods::setClass("cr_data", representation(
   data         = "data.frame",
   causes       = "integer",
-  covars       = "data.frame",
+  feature_vars  = "character",
+  feature_types = "character",
   time_var     = "character",
   event_var    = "character",
   id_var       = "character",
@@ -57,16 +59,34 @@ methods::setClass("cr_data", representation(
 #' @param time_offset Non-negative numeric offset added to all times when the
 #'   minimum observed time is zero.  Must be \code{> 0} in that case; an
 #'   error is raised when it is \code{0} (the default).
-#' @param cens_code  Integer code denoting censored observations in
-#'   \code{event_var} (default \code{0}).
+#' @param cens_code   Numeric code denoting censored observations in
+#'   \code{event_var} (default \code{0}).  Coerced to integer internally.
+#' @param store       Logical; if \code{TRUE}, write the constructed object to
+#'   disk as two files: a Parquet file for \code{cr@data} and a JSON file for
+#'   all other slots (metadata).  Requires \code{store_dir} to be supplied
+#'   (default \code{FALSE}).
+#' @param store_dir   Path to an existing directory where files are written.
+#'   Required when \code{store = TRUE}; ignored otherwise.
+#' @param store_name  Optional character string used as a prefix for the
+#'   output file names.  Files are named
+#'   \code{<store_name>_data.parquet} and \code{<store_name>_metadata.json}.
+#'   If \code{NULL} (default), the names \code{cr_data.parquet} and
+#'   \code{cr_metadata.json} are used.
+#' @param store_overwrite Logical; if \code{FALSE} (default), an error is
+#'   raised when either output file already exists.  Set to \code{TRUE} to
+#'   allow overwriting.
 #'
 #' @return A \code{cr_data} S4 object.
 #' @export
 cr_data <- function(data, time_var, event_var,
-                    sort_by_time = TRUE,
-                    id_var       = NULL,
-                    time_offset  = 0,
-                    cens_code    = 0L) {
+                    sort_by_time     = TRUE,
+                    id_var           = NULL,
+                    time_offset      = 0,
+                    cens_code        = 0,
+                    store            = FALSE,
+                    store_dir        = NULL,
+                    store_name       = NULL,
+                    store_overwrite  = FALSE) {
 
   # --- Input validation ---
   if (!is.data.frame(data))
@@ -162,14 +182,33 @@ cr_data <- function(data, time_var, event_var,
 
   # --- Cause and covariate extraction ---
   causes <- .cr_causes(data, event_var, cens_code)
-  covars <- data.frame(covars_names = feature_cols,
-                       covars_types = covars_types,
-                       stringsAsFactors = FALSE)
 
-  methods::new("cr_data",
+  # --- Store validation (before constructing object) ---
+  if (store) {
+    if (is.null(store_dir) || !nzchar(store_dir))
+      stop("`store_dir` must be supplied when `store = TRUE`.", call. = FALSE)
+    if (!dir.exists(store_dir))
+      stop(sprintf("`store_dir` '%s' does not exist.", store_dir), call. = FALSE)
+
+    prefix     <- if (!is.null(store_name)) store_name else "cr"
+    data_path  <- file.path(store_dir, paste0(prefix, "_data.parquet"))
+    meta_path  <- file.path(store_dir, paste0(prefix, "_metadata.json"))
+
+    existing <- c(data_path, meta_path)[file.exists(c(data_path, meta_path))]
+    if (length(existing) > 0 && !store_overwrite)
+      stop(
+        "The following file(s) already exist and would be overwritten:\n",
+        paste0("  ", existing, collapse = "\n"), "\n",
+        "Re-run with `store_overwrite = TRUE` to allow overwriting.",
+        call. = FALSE
+      )
+  }
+
+  cr <- methods::new("cr_data",
     data         = data,
     causes       = causes,
-    covars       = covars,
+    feature_vars  = feature_cols,
+    feature_types = covars_types,
     time_var     = time_var,
     event_var    = event_var,
     id_var       = id_var,
@@ -177,6 +216,29 @@ cr_data <- function(data, time_var, event_var,
     time_offset  = time_offset,
     cens_code    = cens_code
   )
+
+  # --- Write to disk ---
+  if (store) {
+    arrow::write_parquet(cr@data, data_path)
+    jsonlite::write_json(
+      list(
+        causes       = as.integer(cr@causes),
+        feature_vars  = cr@feature_vars,
+        feature_types = cr@feature_types,
+        time_var     = cr@time_var,
+        event_var    = cr@event_var,
+        id_var       = cr@id_var,
+        sort_by_time = cr@sort_by_time,
+        time_offset  = cr@time_offset,
+        cens_code    = as.integer(cr@cens_code)
+      ),
+      path = meta_path,
+      pretty = TRUE,
+      auto_unbox = TRUE
+    )
+  }
+
+  cr
 }
 
 
@@ -207,7 +269,7 @@ methods::setMethod("summary", "cr_data", function(object, ...) {
   ev_factor <- factor(ev_int, levels = lvls, labels = lbls)
 
   # Assemble table data: time + covariates + event factor
-  covar_names <- object@covars$covars_names
+  covar_names <- object@feature_vars
   tbl_data    <- cbind(
     d[, c(time_var, covar_names), drop = FALSE],
     .event_status = ev_factor
@@ -241,8 +303,8 @@ methods::setMethod("show", "cr_data", function(object) {
   cat(sprintf("  event_var : %s\n", object@event_var))
   cat(sprintf("  id_var    : %s\n", object@id_var))
   cat(sprintf("  Covariates: %d  [%s]\n",
-              nrow(object@covars),
-              paste(object@covars$covars_names, collapse = ", ")))
+              length(object@feature_vars),
+              paste(object@feature_vars, collapse = ", ")))
   if (object@time_offset != 0)
     cat(sprintf("  time_offset applied: %g\n", object@time_offset))
   invisible(object)
@@ -289,13 +351,13 @@ methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
       new_data  <- new_data[, keep_cols, drop = FALSE]
     }
 
-    new_covars <- x@covars[x@covars$covars_names %in% names(new_data), ,
-                           drop = FALSE]
+    keep_feat  <- x@feature_vars %in% names(new_data)
 
     methods::new("cr_data",
       data         = new_data,
       causes       = .cr_causes(new_data, x@event_var, x@cens_code),
-      covars       = new_covars,
+      feature_vars  = x@feature_vars[keep_feat],
+      feature_types = x@feature_types[keep_feat],
       time_var     = x@time_var,
       event_var    = x@event_var,
       id_var       = x@id_var,

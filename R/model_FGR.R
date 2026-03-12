@@ -28,7 +28,7 @@ register_cr_model(
       stop("Please install 'prodlim'.")
 
     formula <- stats::reformulate(
-      obj@covars$covars_names,
+      obj@feature_vars,
       response = paste0("Hist(", obj@time_var, ", ", obj@event_var, ")")
     )
     environment(formula) <- asNamespace("prodlim")

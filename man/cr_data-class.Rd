@@ -36,9 +36,11 @@ construction.
 \item{\code{causes}}{Sorted integer vector of competing cause codes (all
 non-zero values found in \code{event_var}).}
 
-\item{\code{covars}}{A data frame with columns \code{covars_names} and
-\code{covars_types} recording the name and original type of each
-feature column.}
+\item{\code{feature_vars}}{Character vector of feature column names.}
+
+\item{\code{feature_types}}{Character vector of original column types, parallel
+to \code{feature_vars} (one of \code{"logical"}, \code{"factor"},
+\code{"character"}, \code{"integer"}, \code{"numeric"}).}
 
 \item{\code{time_var}}{Name of the time column.}
 
@@ -53,6 +55,6 @@ user-supplied column name or \code{"id"} for the auto-generated column.}
 observed time was zero (0 means no offset was applied).}
 
 \item{\code{cens_code}}{Integer code used to denote censored observations in
-\code{event_var} (default \code{0L}).}
+\code{event_var} (default \code{0}).}
 }}
 
