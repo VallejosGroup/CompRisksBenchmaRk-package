@@ -2,7 +2,8 @@
 % Please edit documentation in R/metrics.R
 \name{OEComputation}
 \alias{OEComputation}
-\title{Observed/Expected ratio for competing risks}
+\title{Observed/Expected ratio
+Observed/Expected ratio for competing risks}
 \usage{
 OEComputation(data, pred_mat, cause, times, horizon)
 }
@@ -21,5 +22,6 @@ OEComputation(data, pred_mat, cause, times, horizon)
 A named numeric vector `c(OE, lower, upper)`.
 }
 \description{
+Observed/Expected ratio
 Observed/Expected ratio for competing risks
 }

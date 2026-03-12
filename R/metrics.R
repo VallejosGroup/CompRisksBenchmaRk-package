@@ -5,196 +5,7 @@
 NULL
 
 
-
-
-#' Weighted Brier Score for competing risks
-#'
-#' Computes the inverse probability of censoring weighted (IPCW) Brier
-#' score at one or more evaluation times.
-#'
-#' @param predictions Numeric matrix `[n, length(tau)]` of predicted
-#'   cumulative incidences (or a numeric vector for a single time point).
-#' @param tau  Numeric scalar or vector of evaluation times.
-#' @param time Numeric vector of observed times.
-#' @param status Integer vector of event codes.
-#' @param cause Integer code of the event of interest.
-#' @param cens.code Integer code for censoring (default `0`).
-#' @param cmprsk Logical; if `TRUE`, use competing risks Brier score
-#'   weights (default `FALSE`).
-#'
-#' @return A list with elements `weighted.brier.score`, `tau`, `n`, and
-#'   `n.risk`.
-#' @export
-WeightedBrierScore <- function(predictions,
-                                tau,
-                                time,
-                                status,
-                                cause,
-                                cens.code = 0L,
-                                cmprsk    = FALSE) {
-  if (is.vector(predictions))
-    predictions <- matrix(as.numeric(predictions), ncol = 1L)
-  else
-    predictions <- as.matrix(predictions)
-  tau <- as.numeric(tau)
-
-  if (ncol(predictions) == 1L && length(tau) > 1L)
-    predictions <- matrix(predictions[, 1L],
-                           nrow = nrow(predictions), ncol = length(tau))
-  if (ncol(predictions) != length(tau))
-    stop("ncol(predictions) must equal length(tau).")
-
-  G <- censor.prob.KM(time = time, status = status, cens.code = cens.code)
-  n <- nrow(predictions)
-  BS_we_all  <- numeric(length(tau))
-  n_risk_all <- integer(length(tau))
-
-  for (jj in seq_along(tau)) {
-    tau_j     <- tau[jj]
-    p_j       <- predictions[, jj]
-    residuals <- rep(0, n)
-
-    for (i in seq_len(n)) {
-      indx1 <- which(G[, 1L] >= time[i])
-      indx2 <- which(G[, 1L] >= tau_j)
-      G1    <- if (length(indx1) > 0L) G[indx1[1L], 2L] else 1
-      G2    <- if (length(indx2) > 0L) G[indx2[1L], 2L] else 1
-
-      if (cmprsk) {
-        if      (status[i] == cause && time[i] <= tau_j)
-          residuals[i] <- (1 - p_j[i])^2 / G1
-        else if (status[i] != cause && status[i] != cens.code && time[i] <= tau_j)
-          residuals[i] <- p_j[i]^2 / G1
-        else if (status[i] == cens.code && time[i] <= tau_j)
-          residuals[i] <- 0
-        else
-          residuals[i] <- p_j[i]^2 / G2
-      } else {
-        if      (time[i] <= tau_j && status[i] == cause)
-          residuals[i] <- (1 - p_j[i])^2 / G1
-        else if (time[i] <= tau_j && status[i] == cens.code)
-          residuals[i] <- 0
-        else
-          residuals[i] <- p_j[i]^2 / G2
-      }
-    }
-    BS_we_all[jj]  <- mean(residuals)
-    n_risk_all[jj] <- sum(time > tau_j)
-  }
-  list(weighted.brier.score = BS_we_all, tau = tau, n = n,
-       n.risk = n_risk_all)
-}
-
-
-#' Integrated Brier Score for competing risks
-#'
-#' Wraps [WeightedBrierScore()] and integrates across time using the
-#' trapezoidal rule.
-#'
-#' @param prediction_matrix Numeric matrix `[n, Tm]` of predictions.
-#' @param taus   Numeric vector of evaluation times (length `Tm`).
-#' @param time   Numeric vector of observed times.
-#' @param status Integer vector of event codes.
-#' @param cause  Integer code of the event of interest.
-#' @param cens.code Integer code for censoring.
-#' @param cmprsk Logical; use competing risks Brier score?
-#'
-#' @return A list with `integrated.brier.score`, `average.brier.score`,
-#'   `weighted.brier.score`, and `taus`.
-#' @export
-IntegratedBrierScore <- function(prediction_matrix,
-                                  taus,
-                                  time,
-                                  status,
-                                  cause,
-                                  cens.code,
-                                  cmprsk) {
-  bs <- WeightedBrierScore(
-    predictions = prediction_matrix,
-    tau         = taus,
-    time        = time,
-    status      = status,
-    cause       = cause,
-    cens.code   = cens.code,
-    cmprsk      = cmprsk
-  )$weighted.brier.score
-
-  t_max <- max(taus)
-  t_min <- min(taus)
-  ibs   <- .trapezoidal_integration(taus, bs) / (t_max - t_min)
-
-  list(integrated.brier.score = ibs,
-       average.brier.score    = mean(bs),
-       weighted.brier.score   = bs,
-       taus                   = taus)
-}
-
-
-#' @noRd
-censor.prob.KM <- function(time, status, cens.code) {
-  tmp              <- data.frame(time = time)
-  tmp$censor.status <- ifelse(status == cens.code, 0L, 1L)
-  fit <- prodlim::prodlim(
-    formula = survival::Surv(time, censor.status) ~ 1,
-    data    = tmp,
-    reverse = TRUE
-  )
-  prob <- stats::predict(fit,
-                         times       = sort(unique(time)),
-                         level.chaos = 1,
-                         mode        = "matrix",
-                         type        = "surv")
-  out <- cbind(sort(unique(time)), prob)
-  stats::na.omit(out)
-}
-
-
-#' C-index for competing risks (Wolbers/SurvMetrics method)
-#'
-#' @param time       Numeric vector of observed times.
-#' @param status     Integer vector of event codes (0 = censored).
-#' @param predicted  Numeric vector of predicted CIF values (or
-#'   `1 - CIF` depending on convention; see `Cause_int`).
-#' @param Cause_int  Integer indicating the cause of interest (default 1).
-#'
-#' @return A list with `cindex` (numeric) and `time_ev` (the evaluation
-#'   time used internally, i.e. `max(time) + 1`).
-#' @export
-CindexCR <- function(time, status, predicted, Cause_int = 1L) {
-  if (any(is.na(time)))      stop("time cannot contain NA.")
-  if (any(is.na(status)))    stop("status cannot contain NA.")
-  if (any(!(status %in% c(0L, 1L, 2L))))
-    stop("status must be 0, 1, or 2.")
-  if (any(is.na(predicted))) stop("predicted cannot contain NA.")
-  if (!(Cause_int %in% status)) stop("Invalid Cause_int.")
-  if (min(time) <= 0) stop("Survival times must be positive.")
-
-  Censoring  <- ifelse(status == 0L, 0L, 1L)
-  Cause      <- ifelse(status == 2L, 2L, 1L)
-  Prediction <- -log(predicted)
-  Time       <- max(time) + 1
-
-  n          <- length(Prediction)
-  A  <- B  <- Q  <- N_t  <- matrix(0L, n, n)
-
-  for (i in seq_len(n)) {
-    A[i, which(time[i] < time)] <- 1L
-    B[i, intersect(
-      intersect(which(time[i] >= time), which(Cause != Cause_int)),
-      which(Censoring == 1L)
-    )] <- 1L
-    Q[i, which(Prediction[i] > Prediction)] <- 1L
-    if (time[i] <= Time && Cause[i] == Cause_int && Censoring[i] == 1L)
-      N_t[i, ] <- 1L
-  }
-
-  Num <- sum((A + B) * Q * N_t)
-  Den <- sum((A + B) * N_t)
-  list(cindex = Num / Den, time_ev = Time)
-}
-
-
-
+#' Observed/Expected ratio
 #' Observed/Expected ratio for competing risks
 #'
 #' @param data     Data frame with `time` and `status` columns.
@@ -249,16 +60,16 @@ OEComputation <- function(data, pred_mat, cause, times, horizon) {
 #'   `debug = TRUE`.
 #' @export
 ibs_from_r <- function(out, e_va, t_va, times, causes,
-                        time_col          = "time",
-                        status_col        = "event",
-                        cens.method       = "ipcw",
-                        cens.model        = "km",
-                        cens.code         = 0L,
-                        force_sequential  = TRUE,
-                        quiet             = TRUE,
-                        log_file          = NULL,
-                        debug             = FALSE,
-                        debug_n           = 5L) {
+                       time_col          = "time",
+                       status_col        = "event",
+                       cens.method       = "ipcw",
+                       cens.model        = "km",
+                       cens.code         = 0L,
+                       force_sequential  = TRUE,
+                       quiet             = TRUE,
+                       log_file          = NULL,
+                       debug             = FALSE,
+                       debug_n           = 5L) {
   if (isTRUE(force_sequential)) {
     foreach::registerDoSEQ()
     data.table::setDTthreads(1L)
@@ -267,20 +78,20 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
       RhpcBLASctl::omp_set_num_threads(1L)
     }
   }
-
+  
   log <- function(...) {
     msg <- paste0(paste(..., collapse = ""), "\n")
     if (!is.null(log_file)) cat(msg, file = log_file, append = TRUE)
     else if (!isTRUE(quiet)) cat(msg)
   }
-
+  
   d  <- dim(out)
   if (length(d) != 3L) stop("`out` must be a 3D array (n, K, T).")
   n  <- d[1L]; K <- d[2L]; Tm <- d[3L]
   log("dim(out) = ", paste(d, collapse = " x "))
   if (length(times)  != Tm) stop("length(times) must equal dim(out)[3].")
   if (length(causes) != K)  stop("length(causes) must equal dim(out)[2].")
-
+  
   times <- as.numeric(times)
   ord   <- order(times)
   if (any(ord != seq_along(times))) {
@@ -288,13 +99,13 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
     times <- times[ord]
   }
   if (any(duplicated(times))) stop("`times` must be unique.")
-
+  
   test        <- data.frame(as.numeric(t_va), as.integer(e_va))
   names(test) <- c(time_col, status_col)
   f           <- stats::as.formula(
     sprintf("prodlim::Hist(%s, %s) ~ 1", time_col, status_col)
   )
-
+  
   run_quiet <- function(expr) {
     if (!isTRUE(quiet)) return(eval.parent(substitute(expr)))
     res <- NULL
@@ -306,11 +117,11 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
     }))
     res
   }
-
+  
   ibs_mat <- matrix(NA_real_, nrow = length(causes), ncol = length(times),
                     dimnames = list(as.character(causes),
-                                   as.character(times)))
-
+                                    as.character(times)))
+  
   for (i in seq_len(K)) {
     k      <- as.integer(causes[i])
     M      <- out[, i, , drop = FALSE]
@@ -318,10 +129,10 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
     M      <- as.matrix(M)
     storage.mode(M) <- "double"
     colnames(M) <- format(times, scientific = FALSE, trim = TRUE)
-
+    
     k_name     <- paste0("cif_cause_", k)
     preds_list <- stats::setNames(list(M), k_name)
-
+    
     sc <- run_quiet(
       riskRegression::Score(
         object       = preds_list,
@@ -344,12 +155,12 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
         plots        = NULL
       )
     )
-
+    
     ibs_val        <- sc$Brier$score[sc$Brier$score$model == k_name, "IBS"]
     ibs_mat[i, ]   <- as.numeric(ibs_val)
     rm(sc, M, preds_list); gc(FALSE)
   }
-
+  
   if (isTRUE(debug)) {
     out_slice <- out[seq_len(min(n, debug_n)),
                      seq_len(min(K, debug_n)),
@@ -396,28 +207,28 @@ ibs_from_r <- function(out, e_va, t_va, times, causes,
 #'   `plot` (a ggplot object).
 #' @export
 ClinicalUtility <- function(data,
-                             outcome,
-                             ttoutcome,
-                             timepoint,
-                             predictors,
-                             xstart         = 0.01,
-                             xstop          = 0.99,
-                             xby            = 0.01,
-                             ymin           = -0.05,
-                             probability    = NULL,
-                             harm           = NULL,
-                             graph          = TRUE,
-                             intervention   = FALSE,
-                             interventionper = 100,
-                             smooth         = FALSE,
-                             loess.span     = 0.10,
-                             cmprsk         = TRUE) {
-
+                            outcome,
+                            ttoutcome,
+                            timepoint,
+                            predictors,
+                            xstart         = 0.01,
+                            xstop          = 0.99,
+                            xby            = 0.01,
+                            ymin           = -0.05,
+                            probability    = NULL,
+                            harm           = NULL,
+                            graph          = TRUE,
+                            intervention   = FALSE,
+                            interventionper = 100,
+                            smooth         = FALSE,
+                            loess.span     = 0.10,
+                            cmprsk         = TRUE) {
+  
   data <- data[stats::complete.cases(
     data[c(outcome, ttoutcome, predictors)]),
     c(outcome, ttoutcome, predictors)]
   data <- as.data.frame(data)
-
+  
   if (!cmprsk &&
       length(data[!(data[[outcome]] %in% c(0, 1)), outcome]) > 0)
     stop("outcome must be coded as 0 and 1 when cmprsk = FALSE.")
@@ -426,7 +237,7 @@ ClinicalUtility <- function(data,
   if (xstop  < 0 || xstop  > 1) stop("xstop must lie between 0 and 1.")
   if (xby   <= 0 || xby    >= 1) stop("xby must lie between 0 and 1.")
   if (xstart >= xstop)            stop("xstop must be larger than xstart.")
-
+  
   pred.n <- length(predictors)
   if (length(probability) > 0 && pred.n != length(probability))
     stop("Length of probability must match number of predictors.")
@@ -436,7 +247,7 @@ ClinicalUtility <- function(data,
   if (length(probability) == 0L) probability <- rep(TRUE, pred.n)
   if (any(predictors %in% c("all", "none")))
     stop("Predictor names cannot be 'all' or 'none'.")
-
+  
   for (m in seq_len(pred.n)) {
     if (!probability[m] %in% c(TRUE, FALSE))
       stop("Each probability element must be TRUE or FALSE.")
@@ -457,7 +268,7 @@ ClinicalUtility <- function(data,
       message(predictors[m], " converted to probability via Cox PH.")
     }
   }
-
+  
   N  <- nrow(data)
   if (!cmprsk) {
     km <- survival::survfit(
@@ -467,21 +278,21 @@ ClinicalUtility <- function(data,
     cr <- cmprsk::cuminc(data[[ttoutcome]], data[[outcome]])
     pd <- cmprsk::timepoints(cr, times = timepoint)$est[1L]
   }
-
+  
   nb    <- data.frame(threshold = seq(xstart, xstop, by = xby))
   interv <- nb
   error  <- NULL
-
+  
   nb[["all"]]  <- pd - (1 - pd) * nb$threshold / (1 - nb$threshold)
   nb[["none"]] <- 0
-
+  
   for (m in seq_len(pred.n)) {
     nb[[predictors[m]]] <- NA_real_
     for (t in seq_len(nrow(nb))) {
       px <- sum(data[[predictors[m]]] > nb$threshold[t]) / N
       if (px == 0) {
         error <- c(error, paste0(predictors[m], ": no obs above ",
-                                  nb$threshold[t] * 100, "%."))
+                                 nb$threshold[t] * 100, "%."))
         break
       }
       if (!cmprsk) {
@@ -509,10 +320,10 @@ ClinicalUtility <- function(data,
     interv[[predictors[m]]] <- (nb[[predictors[m]]] - nb[["all"]]) *
       interventionper / (interv$threshold / (1 - interv$threshold))
   }
-
+  
   if (length(error))
     message(paste(error, collapse = "\n"), " Net benefit not calculable.")
-
+  
   if (smooth) {
     for (m in seq_len(pred.n)) {
       valid <- !is.na(nb[[predictors[m]]])
@@ -527,7 +338,7 @@ ClinicalUtility <- function(data,
       }
     }
   }
-
+  
   results <- list(
     N                    = N,
     predictors           = data.frame(predictor = predictors,
@@ -538,7 +349,7 @@ ClinicalUtility <- function(data,
     net.benefit          = nb,
     interventions.avoided = interv
   )
-
+  
   if (graph) {
     plot_data <- if (intervention) interv else nb
     ylab_str  <- if (intervention)
@@ -546,11 +357,11 @@ ClinicalUtility <- function(data,
     else
       "Net benefit"
     results$plot <- plot_dca_gg(nb        = plot_data,
-                                 predictors = predictors,
-                                 ylab       = ylab_str,
-                                 ymin       = ymin)
+                                predictors = predictors,
+                                ylab       = ylab_str,
+                                ymin       = ymin)
   }
-
+  
   results
 }
 
@@ -567,16 +378,16 @@ ClinicalUtility <- function(data,
 #' @return A ggplot object.
 #' @export
 plot_dca_gg <- function(nb, predictors,
-                         ylab = "Net benefit",
-                         ymin = NULL,
-                         model_cols = list(
-                           csCPH   = "#F8766D",
-                           DeepHit = "#B79F00",
-                           DeSurv  = "#00BA38",
-                           FGR     = "#00BFC4",
-                           FGRP    = "#619CFF",
-                           RSF     = "#F564E3"
-                         )) {
+                        ylab = "Net benefit",
+                        ymin = NULL,
+                        model_cols = list(
+                          csCPH   = "#F8766D",
+                          DeepHit = "#B79F00",
+                          DeSurv  = "#00BA38",
+                          FGR     = "#00BFC4",
+                          FGRP    = "#619CFF",
+                          RSF     = "#F564E3"
+                        )) {
   predictors   <- as.character(predictors)
   extract_model <- function(s) {
     m <- regmatches(s, regexpr("(csCPH|DeepHit|DeSurv|FGRP|FGR|RSF)", s))
@@ -587,7 +398,7 @@ plot_dca_gg <- function(nb, predictors,
   model_cols  <- unlist(model_cols)
   col_map     <- c("Treat none" = "black", "Treat all" = "grey40",
                    model_cols[pred_labels])
-
+  
   df <- nb |>
     dplyr::select(threshold, dplyr::all_of(c("all", "none", predictors))) |>
     tidyr::pivot_longer(-threshold, names_to = "model_raw", values_to = "y") |>
@@ -599,7 +410,7 @@ plot_dca_gg <- function(nb, predictors,
       ),
       model = factor(model, levels = c("Treat none", "Treat all", pred_labels))
     )
-
+  
   p <- ggplot2::ggplot(df, ggplot2::aes(threshold, y, color = model)) +
     ggplot2::geom_hline(yintercept = 0, color = "grey70", linewidth = 0.6) +
     ggplot2::geom_line(linewidth = 0.9, na.rm = TRUE) +
@@ -611,7 +422,7 @@ plot_dca_gg <- function(nb, predictors,
                    legend.title     = ggplot2::element_blank(),
                    legend.text      = ggplot2::element_text(size = 8)) +
     ggplot2::labs(x = "Threshold probability", y = ylab)
-
+  
   if (!is.null(ymin))
     p <- p + ggplot2::coord_cartesian(ylim = c(ymin, NA))
   p
