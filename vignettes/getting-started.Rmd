@@ -203,28 +203,25 @@ sapply(scores, function(s) s$IBS["cause_2", "value"])
 
 ## 5  Calibration
 
-`CalibrationPlot()` accepts a `cr_data` object and a CIF list (as returned by
-`predict_cif()`), iterates over all competing causes internally, and derives
-the model label from `$model_key`.  Here we plot calibration at the 5-year
-horizon for each model and each cause.
+Calibration measures (ICI, E50, E90, Emax, RSB) and O/E ratios are computed
+via `compute_metrics()` using the `"calib_measures"` metric.  Calibration is
+evaluated at each element of `eval_times` and returned for all competing
+causes.
 
-```{r calibration, fig.alt="Calibration plots at 5 years for all causes"}
+```{r calibration}
 horizon <- 5
 
-cal_FGR   <- CalibrationPlot(cr = cr, cif = cif_FGR,   tau = horizon)
-cal_csCPH <- CalibrationPlot(cr = cr, cif = cif_csCPH, tau = horizon)
-cal_RSF   <- CalibrationPlot(cr = cr, cif = cif_RSF,   tau = horizon)
-cal_FGRP  <- CalibrationPlot(cr = cr, cif = cif_FGRP,  tau = horizon)
+calib_FGR   <- compute_metrics(cr, eval_times = horizon, cif = cif_FGR,
+                                metrics = "calib_measures")
+calib_csCPH <- compute_metrics(cr, eval_times = horizon, cif = cif_csCPH,
+                                metrics = "calib_measures")
+calib_RSF   <- compute_metrics(cr, eval_times = horizon, cif = cif_RSF,
+                                metrics = "calib_measures")
+calib_FGRP  <- compute_metrics(cr, eval_times = horizon, cif = cif_FGRP,
+                                metrics = "calib_measures")
 
-# Print all plots (one per cause per model)
-for (cal in list(cal_FGR, cal_csCPH, cal_RSF, cal_FGRP))
-  lapply(cal$graphs, function(p) print(p[[1]]))
-
-# Calibration measures (ICI, E50, E90, Emax, RSB) for FGR — all causes
-cal_FGR$calib_measures
-
-# O/E ratios with 95% CI for FGR — all causes
-cal_FGR$OE_summary
+# Calibration measures for FGR — all causes at the 5-year horizon
+calib_FGR$calib_measures
 ```
 
 ---

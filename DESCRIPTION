@@ -68,7 +68,6 @@ Collate:
     'compute_rmlt.R'
     'scoring.R'
     'metrics.R'
-    'CalibrationPlot.R'
     'compute_metrics.R'
     'nested_cv.R'
     'model_FGR.R'

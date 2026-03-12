@@ -94,7 +94,7 @@
 #'     summary that does not depend on a specific time horizon.}
 #'
 #'   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
-#'     Emax, RSB) computed via an internal `CalibrationPlot()` routine.
+#'     Emax, RSB) computed via an internal `.compute_calibration()` routine.
 #'     These quantify agreement between predicted CIF values and observed
 #'     event fractions at each evaluation time.}
 #' }
@@ -281,7 +281,7 @@ compute_metrics <- function(cr, eval_times = NULL,
   }
 
   if (comp_calib) {
-    cal <- CalibrationPlot(
+    cal <- .compute_calibration(
       cr              = cr,
       cif             = list(cif = cif, time_grid = cif_time_grid,
                              model_key = cause_nms[1]),

@@ -187,11 +187,10 @@ get_results <- function(data_root,
                       time_grid = times,
                       model_key = model)
 
-    plotFrame <- CalibrationPlot(
+    plotFrame <- .compute_calibration(
       cr              = cr_all,
       cif             = cif_all,
       tau             = horizon_use,
-      cause           = cause_of_interest,
       loess_smoothing = TRUE,
       graph           = TRUE
     )

@@ -161,7 +161,7 @@ NULL
     keep <- !is.na(prediction) & !is.na(pseudo)
     if (sum(keep) < 5) {
       warning(sprintf(
-        "CalibrationPlot: <5 non-missing points at tau=%g for cause %s.",
+        ".compute_calibration: <5 non-missing points at tau=%g for cause %s.",
         eval_time, cause_nm
       ))
       next
@@ -263,5 +263,107 @@ NULL
     values         = plotFrames,
     calib_measures = do.call(rbind, Filter(Negate(is.null), measures)),
     OE_summary     = OE_summary
+  )
+}
+
+
+#' Compute calibration plots and measures for all competing causes
+#'
+#' Internal function producing pseudo-value calibration plots and numerical
+#' calibration measures for all causes in a [cr_data()] object.
+#'
+#' @param cr            A [cr_data()] object.
+#' @param cif           A list as returned by [predict_cif()].
+#'   Mutually exclusive with `fit`.
+#' @param fit           A fitted model object. Mutually exclusive with `cif`.
+#' @param cif_time_grid Numeric time grid; required when `fit` is supplied,
+#'   must be `NULL` when `cif` is supplied.
+#' @param tau           Numeric scalar or vector of evaluation times (sorted,
+#'   no NAs).
+#' @param loess_smoothing Logical; use LOESS smoothing (default `TRUE`).
+#' @param bandwidth     Optional bandwidth for nearest-neighbour smoothing.
+#' @param graph         Logical; produce ggplot objects? (default `TRUE`).
+#'
+#' @return A list with elements `graphs`, `values`, `calib_measures`, and
+#'   `OE_summary`.
+#' @noRd
+.compute_calibration <- function(cr,
+                                  cif           = NULL,
+                                  fit           = NULL,
+                                  cif_time_grid = NULL,
+                                  tau,
+                                  loess_smoothing = TRUE,
+                                  bandwidth       = NULL,
+                                  graph           = TRUE) {
+  .check_cr(cr)
+
+  if (missing(tau) || !is.numeric(tau) || length(tau) == 0)
+    stop("`tau` must be a non-empty numeric vector.", call. = FALSE)
+  if (anyNA(tau) || is.unsorted(tau))
+    stop("`tau` must be sorted and contain no NA values.", call. = FALSE)
+
+  cif_in     <- .resolve_cif(cif, fit, cif_time_grid, cr)
+  unpacked   <- .validate_and_unpack_cif(cif_in, cr)
+  cif_arr    <- unpacked$cif
+  model_name <- unpacked$model_key
+
+  tau <- as.numeric(tau)
+
+  # Snap tau to time_grid once — shared across all causes
+  time_grid <- unpacked$time_grid
+  snap_idx  <- vapply(tau, function(t) which.min(abs(time_grid - t)),
+                      integer(1))
+
+  causes    <- cr@causes
+  cause_nms <- paste0("cause_", causes)
+  time      <- cr@data[[cr@time_var]]
+  status    <- cr@data[[cr@event_var]]
+  cens_code <- cr@cens_code
+
+  # Fit marginal model once — shared across all causes and all tau
+  margForm <- prodlim::Hist(time, status, cens.code = cens_code) ~ 1
+  margFit  <- prodlim::prodlim(margForm, data = cr@data)
+
+  graphs_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
+  values_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
+  calib_measures_list <- vector("list", length(causes))
+  OE_list             <- vector("list", length(causes))
+
+  for (i in seq_along(causes)) {
+    k        <- causes[i]
+    cause_nm <- cause_nms[i]
+
+    # Slice cause and snap to tau
+    pred_full   <- cif_arr[, i, , drop = TRUE]         # [n, Tm_grid]
+    pred_at_tau <- pred_full[, snap_idx, drop = FALSE]  # [n, length(tau)]
+
+    res <- .calibration_one_cause(
+      pred_at_tau     = pred_at_tau,
+      tau             = tau,
+      cause           = k,
+      cause_idx       = i,
+      cause_nm        = cause_nm,
+      model_name      = model_name,
+      time            = time,
+      status          = status,
+      cens_code       = cens_code,
+      cr              = cr,
+      margFit         = margFit,
+      loess_smoothing = loess_smoothing,
+      bandwidth       = bandwidth,
+      graph           = graph
+    )
+
+    graphs_out[[cause_nm]]   <- res$graphs
+    values_out[[cause_nm]]   <- res$values
+    calib_measures_list[[i]] <- res$calib_measures
+    OE_list[[i]]             <- res$OE_summary
+  }
+
+  list(
+    graphs         = if (graph) graphs_out else NULL,
+    values         = values_out,
+    calib_measures = do.call(rbind, calib_measures_list),
+    OE_summary     = do.call(rbind, OE_list)
   )
 }
