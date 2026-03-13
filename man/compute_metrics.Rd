@@ -12,8 +12,7 @@ compute_metrics(
   metrics = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
   pred_horizons = NULL,
   args_riskRegression = list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
-  args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE,
-    eval.times = NULL),
+  args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
   args_rmlt = list(maxT = NULL),
   snap_tol = 0.1,
   collapse_as_df = TRUE
@@ -60,11 +59,10 @@ Any element supplied here overrides the corresponding default.}
 \item{args_pec}{A named list of additional arguments passed to
 `pec::cindex()`. Relevant for `"cindex_t_year"` and `"cindex_rmlt"`.
 Defaults: `list(cens.model = "marginal", splitMethod = "noPlan",
-verbose = FALSE, eval.times = NULL)`. Any element supplied here overrides
-the corresponding default.  `eval.times` controls the time horizon used
-for IPCW weight truncation in C-index estimation; when `NULL` it defaults
-to the maximum observed event time in `cr` and a message is issued, as
-IPCW weights are unstable near the end of follow-up.}
+verbose = FALSE)`. Any element supplied here overrides the corresponding
+default. `eval.times` controls the time horizon used for IPCW weight
+truncation; when `NULL`, defaults to the maximum observed event time in
+`cr` and a message is issued.}
 
 \item{args_rmlt}{A named list of additional arguments passed to
 [compute_rmlt()]. Relevant for `"cindex_rmlt"`. Defaults:
