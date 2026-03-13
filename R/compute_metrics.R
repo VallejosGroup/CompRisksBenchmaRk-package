@@ -61,8 +61,9 @@
 #'   For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
 #'   columns correspond to `pred_horizons`.  For scalar metrics (`"IBS"`,
 #'   `"cindex_rmlt"`), a single `value` column is used.  For
-#'   `"calib_measures"`, columns are the calibration statistics, with one row
-#'   per cause per evaluation time and an additional `time` column.
+#'   `"calib_measures"`, the result is a data frame with columns `cause`,
+#'   `pred_horizons`, and the calibration statistics (`ICI`, `E50`, `E90`,
+#'   `Emax`, `RSB`), with one row per cause per prediction horizon.
 #'   `calib_graphs` is always returned as a named list regardless of this
 #'   setting.
 #'
@@ -322,7 +323,7 @@ compute_metrics <- function(cr,
       graph           = TRUE
     )
     for (nm in cause_nms) {
-      calib_measures[[nm]] <- cal$calib_measures[cal$calib_measures$cause == nm, ]
+      calib_measures[[nm]] <- cal$calib_measures[[nm]]
       calib_graphs[[nm]]   <- cal$graphs[[nm]]
     }
   }
@@ -352,7 +353,7 @@ compute_metrics <- function(cr,
       df   <- data.frame(value = vals, row.names = names(lst))
     } else if (metric_nm == "calib_measures") {
       df <- do.call(rbind, lapply(names(lst), function(nm) {
-        cbind(cause = nm, time = pred_horizons, lst[[nm]])
+        cbind(cause = nm, lst[[nm]])
       }))
       rownames(df) <- NULL
     } else {

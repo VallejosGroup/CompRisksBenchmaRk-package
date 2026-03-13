@@ -93,15 +93,14 @@ NULL
 }
 
 
-#' Calibration for a single cause at all tau
+#' Calibration for a single cause at all prediction horizons
 #'
-#' @param pred_at_tau  Numeric matrix `[n, length(tau)]` of predicted CIF
-#'   values for this cause, already snapped to `tau`.
-#' @param tau          Numeric vector of evaluation times.
+#' @param cif_at_horizon Numeric matrix `[n, length(pred_horizons)]` of predicted CIF
+#'   values for this cause, already snapped to `pred_horizons`.
+#' @param pred_horizons Numeric vector of evaluation times.
 #' @param cause        Integer cause code.
 #' @param cause_idx    Integer position of this cause in `cr@causes`.
 #' @param cause_nm     Character name of this cause (e.g. `"cause_1"`).
-#' @param model_name   Character label used in plot titles.
 #' @param time         Numeric vector of observed times.
 #' @param status       Integer vector of event codes.
 #' @param cens_code    Integer censoring code.
@@ -114,13 +113,13 @@ NULL
 #' @return A list with elements `graphs`, `values`, `calib_measures`,
 #'   `OE_summary` — all for this cause only.
 #' @noRd
-.compute_calibration_per_cause <- function(pred_at_tau, tau, cause, cause_idx,
-                                    cause_nm, model_name,
+.compute_calibration_per_cause <- function(cif_at_horizon, pred_horizons,
+                                    cause, cause_idx, cause_nm,
                                     time, status, cens_code, cr,
                                     margFit, loess_smoothing, bandwidth,
                                     graph) {
   # O/E at the last (or only) horizon
-  horizon <- tau[length(tau)]
+  horizon <- pred_horizons[length(pred_horizons)]
   obj     <- summary(
     survival::survfit(
       survival::Surv(time, factor(status, levels = c(cens_code, cr@causes))) ~ 1
@@ -129,8 +128,8 @@ NULL
   )
   aj          <- list(obs = as.numeric(obj$pstate[, cause_idx + 1L]),
                       se  = as.numeric(obj$std.err[, cause_idx + 1L]))
-  horizon_idx <- which.min(abs(tau - horizon))
-  OE          <- aj$obs / mean(pred_at_tau[, horizon_idx])
+  horizon_idx <- which.min(abs(pred_horizons - horizon))
+  OE          <- aj$obs / mean(cif_at_horizon[, horizon_idx])
   OE_summary  <- data.frame(
     cause = cause_nm,
     OE    = OE,
@@ -141,16 +140,16 @@ NULL
   e_txt <- sprintf(", OE = %.3f (CI: %.3f\u2013%.3f)",
                    OE_summary$OE, OE_summary$lower, OE_summary$upper)
 
-  plotFrames <- vector("list", length(tau))
-  measures   <- vector("list", length(tau))
-  graphs     <- vector("list", length(tau))
+  plotFrames <- vector("list", length(pred_horizons))
+  measures   <- vector("list", length(pred_horizons))
+  graphs     <- vector("list", length(pred_horizons))
 
-  for (i in seq_along(tau)) {
-    prediction <- pred_at_tau[, i]
-    eval_time  <- tau[i]
+  for (i in seq_along(pred_horizons)) {
+    prediction <- cif_at_horizon[, i]
+    eval_time  <- pred_horizons[i]
 
     if (length(unique(stats::na.omit(prediction))) <= 1) {
-      measures[[i]] <- data.frame(cause = cause_nm, tau = eval_time,
+      measures[[i]] <- data.frame(pred_horizons = eval_time,
                                    ICI = NA, E50 = NA, E90 = NA,
                                    Emax = NA, RSB = NA)
       next
@@ -196,8 +195,7 @@ NULL
 
     error         <- plotFrames[[i]]$pred - plotFrames[[i]]$obs
     measures[[i]] <- data.frame(
-      cause = cause_nm,
-      tau   = eval_time,
+      pred_horizons = eval_time,
       ICI   = mean(abs(error), na.rm = TRUE),
       E50   = suppressWarnings(stats::quantile(abs(error), 0.5, na.rm = TRUE)),
       E90   = suppressWarnings(stats::quantile(abs(error), 0.9, na.rm = TRUE)),
@@ -238,7 +236,7 @@ NULL
         ggplot2::labs(
           x     = "Predicted risk",
           y     = "Observed proportions (pseudo-values)",
-          title = paste0(model_name, " calibration for cause ", cause,
+          title = paste0("Calibration for cause ", cause,
                          " at time ", round(eval_time, 1), e_txt)
         ) +
         ggplot2::theme_minimal()
@@ -329,12 +327,11 @@ NULL
     dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(pred_horizons))
 
     res <- .compute_calibration_per_cause(
-      pred_at_tau     = cif_at_horizon,
-      tau             = pred_horizons,
+      cif_at_horizon  = cif_at_horizon,
+      pred_horizons   = pred_horizons,
       cause           = k,
       cause_idx       = i,
       cause_nm        = cause_nm,
-      model_name      = cause_nm,
       time            = time,
       status          = status,
       cens_code       = cens_code,
@@ -345,16 +342,16 @@ NULL
       graph           = graph
     )
 
-    graphs_out[[cause_nm]]   <- res$graphs
-    values_out[[cause_nm]]   <- res$values
-    calib_measures_list[[i]] <- res$calib_measures
-    OE_list[[i]]             <- res$OE_summary
+    graphs_out[[cause_nm]]        <- res$graphs
+    values_out[[cause_nm]]        <- res$values
+    calib_measures_list[[cause_nm]] <- res$calib_measures
+    OE_list[[i]]                  <- res$OE_summary
   }
 
   list(
     graphs         = if (graph) graphs_out else NULL,
     values         = values_out,
-    calib_measures = do.call(rbind, calib_measures_list),
+    calib_measures = calib_measures_list,
     OE_summary     = do.call(rbind, OE_list)
   )
 }

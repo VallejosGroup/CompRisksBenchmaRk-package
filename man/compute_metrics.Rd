@@ -84,8 +84,9 @@ the output list is collapsed into a data frame with one row per cause.
 For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
 columns correspond to `pred_horizons`.  For scalar metrics (`"IBS"`,
 `"cindex_rmlt"`), a single `value` column is used.  For
-`"calib_measures"`, columns are the calibration statistics, with one row
-per cause per evaluation time and an additional `time` column.
+`"calib_measures"`, the result is a data frame with columns `cause`,
+`pred_horizons`, and the calibration statistics (`ICI`, `E50`, `E90`,
+`Emax`, `RSB`), with one row per cause per prediction horizon.
 `calib_graphs` is always returned as a named list regardless of this
 setting.}
 }
