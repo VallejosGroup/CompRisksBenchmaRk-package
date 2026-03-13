@@ -108,7 +108,7 @@ NULL
 #'   per element of `pred_horizons`.
 #' @noRd
 .compute_OE <- function(cif_at_horizon, pred_horizons, cause_idx,
-                         time, status, cens_code, cr) {
+                        time, status, cens_code, cr) {
   sf  <- survival::survfit(
     survival::Surv(time, factor(status, levels = c(cens_code, cr@causes))) ~ 1
   )
@@ -147,10 +147,10 @@ NULL
 #'   `RSB`, `OE`, `OE_lower`, `OE_upper` — one row per horizon).
 #' @noRd
 .compute_calibration_per_cause <- function(cif_at_horizon, pred_horizons,
-                                    cause, cause_idx, cause_nm,
-                                    time, status, cens_code, cr,
-                                    margFit, loess_smoothing, bandwidth,
-                                    graph) {
+                                           cause, cause_idx, cause_nm,
+                                           time, status, cens_code, cr,
+                                           margFit, loess_smoothing, bandwidth,
+                                           graph) {
   OE_df <- .compute_OE(
     cif_at_horizon = cif_at_horizon,
     pred_horizons  = pred_horizons,
@@ -160,26 +160,27 @@ NULL
     cens_code      = cens_code,
     cr             = cr
   )
-
-  plotFrames <- vector("list", length(pred_horizons))
-  measures   <- vector("list", length(pred_horizons))
-  graphs     <- vector("list", length(pred_horizons))
-
+  
+  ph_nms     <- paste0("pred_horizons_", pred_horizons)
+  plotFrames <- stats::setNames(vector("list", length(pred_horizons)), ph_nms)
+  measures   <- stats::setNames(vector("list", length(pred_horizons)), ph_nms)
+  graphs     <- stats::setNames(vector("list", length(pred_horizons)), ph_nms)
+  
   for (i in seq_along(pred_horizons)) {
     prediction <- cif_at_horizon[, i]
     eval_time  <- pred_horizons[i]
-
+    
     if (length(unique(stats::na.omit(prediction))) <= 1) {
       measures[[i]] <- data.frame(pred_horizons = eval_time,
-                                   ICI = NA, E50 = NA, E90 = NA,
-                                   Emax = NA, RSB = NA,
-                                   OE_df[i, , drop = FALSE],
-                                   row.names = NULL)
+                                  ICI = NA, E50 = NA, E90 = NA,
+                                  Emax = NA, RSB = NA,
+                                  OE_df[i, , drop = FALSE],
+                                  row.names = NULL)
       next
     }
-
+    
     pseudo <- prodlim::jackknife(margFit, cause = cause, times = eval_time)
-
+    
     keep <- !is.na(prediction) & !is.na(pseudo)
     if (sum(keep) < 5) {
       warning(sprintf(
@@ -193,10 +194,10 @@ NULL
     x          <- pred_use
     y          <- pseudo_use
     if (length(unique(x)) < length(x)) x <- jitter(x, factor = 1e-6)
-
+    
     if (!loess_smoothing) {
       bw  <- if (is.null(bandwidth)) prodlim::neighborhood(x)$bandwidth
-              else bandwidth
+      else bandwidth
       nbh <- prodlim::meanNeighbors(x = x, y = y, bandwidth = bw)
       plotFrames[[i]] <- data.frame(pred = nbh$uniqueX, obs = nbh$averageY,
                                     lower = NA_real_, upper = NA_real_)
@@ -206,7 +207,7 @@ NULL
       pseudo_use <- pseudo_use[ord]
       pseu       <- data.frame(risk = pred_use, pseudovalue = pseudo_use)
       fit_loess  <- stats::loess(pseudovalue ~ risk, data = pseu,
-                                  degree = 1, span = 0.3)
+                                 degree = 1, span = 0.3)
       sm         <- stats::predict(fit_loess, se = TRUE)
       plotFrames[[i]] <- data.frame(
         pred  = pseu$risk,
@@ -215,7 +216,7 @@ NULL
         upper = pmin(sm$fit + stats::qt(0.975, sm$df) * sm$se, 1)
       )
     }
-
+    
     error         <- plotFrames[[i]]$pred - plotFrames[[i]]$obs
     measures[[i]] <- data.frame(
       pred_horizons = eval_time,
@@ -227,7 +228,7 @@ NULL
       OE_df[i, , drop = FALSE],
       row.names = NULL
     )
-
+    
     if (graph) {
       df           <- plotFrames[[i]]
       pred_hist    <- prediction[!is.na(prediction)]
@@ -249,11 +250,11 @@ NULL
         spikes_df <- data.frame(x = bins_valid,
                                 y0 = spike_bounds[1], y1 = fr_sc)
       }
-
+      
       p <- ggplot2::ggplot(df, ggplot2::aes(x = pred, y = obs)) +
         ggplot2::geom_line(linewidth = 1) +
         ggplot2::geom_abline(slope = 1, intercept = 0,
-                              linetype = "dashed", colour = "red") +
+                             linetype = "dashed", colour = "red") +
         ggplot2::scale_y_continuous(breaks = seq(0, 0.6, by = 0.1),
                                     limits = c(spike_bounds[1], 0.6)) +
         ggplot2::coord_cartesian(xlim = c(0, x_max), expand = FALSE) +
@@ -264,12 +265,12 @@ NULL
                          " at time ", round(eval_time, 1))
         ) +
         ggplot2::theme_minimal()
-
+      
       if (!all(is.na(df$lower)))
         p <- p + ggplot2::geom_ribbon(
           ggplot2::aes(ymin = lower, ymax = upper), alpha = 0.2
         )
-
+      
       if (!is.null(spikes_df))
         p <- p + ggplot2::geom_segment(
           data        = spikes_df,
@@ -279,7 +280,7 @@ NULL
       graphs[[i]] <- p
     }
   }
-
+  
   list(
     graphs         = graphs,
     values         = plotFrames,
@@ -314,44 +315,44 @@ NULL
 #'   `ICI`, `E50`, `E90`, `Emax`, `RSB`, `OE`, `OE_lower`, `OE_upper`).
 #' @noRd
 .compute_calibration <- function(cr,
-                                  cif_arr,
-                                  cif_time_grid,
-                                  pred_horizons,
-                                  snapped_times,
-                                  loess_smoothing = TRUE,
-                                  bandwidth       = NULL,
-                                  graph           = TRUE) {
-
+                                 cif_arr,
+                                 cif_time_grid,
+                                 pred_horizons,
+                                 snapped_times,
+                                 loess_smoothing = TRUE,
+                                 bandwidth       = NULL,
+                                 graph           = TRUE) {
+  
   horizon_idx <- match(snapped_times, cif_time_grid)
   if (anyNA(horizon_idx))
     stop(
       "`snapped_times` contains values not found in the CIF time grid.",
       call. = FALSE
     )
-
+  
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
   time      <- cr@data[[cr@time_var]]
   status    <- cr@data[[cr@event_var]]
   cens_code <- cr@cens_code
-
+  
   # Fit marginal model once — shared across all causes and all horizon values
   margForm <- prodlim::Hist(time, status, cens.code = cens_code) ~ 1
   margFit  <- prodlim::prodlim(margForm, data = cr@data)
-
+  
   graphs_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
   values_out          <- stats::setNames(vector("list", length(causes)), cause_nms)
   calib_measures_list <- stats::setNames(vector("list", length(causes)), cause_nms)
-
+  
   for (i in seq_along(causes)) {
     k        <- causes[i]
     cause_nm <- cause_nms[i]
-
+    
     # Extract predicted CIF for this cause at the pre-snapped horizon indices.
     # cif_arr is [n, K, Tm]; result is squeezed to [n, length(pred_horizons)].
     cif_at_horizon <- cif_arr[, i, horizon_idx, drop = FALSE][, 1, , drop = FALSE]
     dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(pred_horizons))
-
+    
     res <- .compute_calibration_per_cause(
       cif_at_horizon  = cif_at_horizon,
       pred_horizons   = pred_horizons,
@@ -367,12 +368,12 @@ NULL
       bandwidth       = bandwidth,
       graph           = graph
     )
-
+    
     graphs_out[[cause_nm]]          <- res$graphs
     values_out[[cause_nm]]          <- res$values
     calib_measures_list[[cause_nm]] <- res$calib_measures
   }
-
+  
   list(
     graphs         = if (graph) graphs_out else NULL,
     values         = values_out,
