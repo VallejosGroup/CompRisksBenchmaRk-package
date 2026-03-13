@@ -56,16 +56,24 @@
 #'   `0.1`).  Set to a finite value to guard against accidentally passing
 #'   horizons that are far from the estimated time grid, or to `Inf` to
 #'   disable the check entirely.
-#' @param collapse_as_df Logical; if `TRUE` (default), each metric element in
-#'   the output list is collapsed into a data frame with one row per cause.
-#'   For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
-#'   columns correspond to `pred_horizons`.  For scalar metrics (`"IBS"`,
-#'   `"cindex_rmlt"`), a single `value` column is used.  For
-#'   `"calib_measures"`, the result is a data frame with columns `cause`,
-#'   `pred_horizons`, and the calibration statistics (`ICI`, `E50`, `E90`,
-#'   `Emax`, `RSB`), with one row per cause per prediction horizon.
-#'   `calib_graphs` is always returned as a named list regardless of this
-#'   setting.
+#' @param collapse_as_df Logical; if `TRUE` (default), metrics are collapsed
+#'   into data frames:
+#'   \describe{
+#'     \item{`metrics`}{A data frame with columns `cause`, `pred_horizons`,
+#'       and one column per requested horizon-varying metric (`"Brier"`,
+#'       `"IBS"`, `"tdAUC"`, `"cindex_t_year"`) and/or calibration statistic
+#'       (`ICI`, `E50`, `E90`, `Emax`, `RSB`, `OE`, `OE_lower`, `OE_upper`).
+#'       Horizon-varying metrics and calibration columns are joined on
+#'       `cause` + `pred_horizons`.}
+#'     \item{`scalar_metrics`}{A data frame with columns `cause` and one
+#'       column per requested scalar metric (`"cindex_rmlt"`). Only present
+#'       if a scalar metric was requested.}
+#'     \item{`calib_graphs`}{A named list (keyed by cause) of ggplot objects,
+#'       one per `pred_horizons` value. Always a list regardless of
+#'       `collapse_as_df`.}
+#'   }
+#'   When `collapse_as_df = FALSE`, each metric is returned as a named list
+#'   with one entry per cause.
 #'
 #' @details
 #' The following metrics are supported, computed separately for each competing
@@ -106,13 +114,23 @@
 #'     always returned alongside in `calib_graphs`.}
 #' }
 #'
-#' @return A named list with one element per requested metric.  When
-#'   `collapse_as_df = TRUE` (default), each element (except `calib_graphs`)
-#'   is a data frame with one row per cause.  When `collapse_as_df = FALSE`,
-#'   each element is itself a named list with one entry per cause.
-#'   `calib_graphs` is always a named list keyed by cause (e.g. `"cause_1"`),
-#'   each containing a list of ggplot objects — one per element of
-#'   `pred_horizons`.
+#' @return When `collapse_as_df = TRUE` (default), a named list with some
+#'   subset of the following elements, depending on which metrics were
+#'   requested:
+#'   \describe{
+#'     \item{`metrics`}{Data frame with columns `cause`, `pred_horizons`, and
+#'       one column per requested horizon-varying metric and/or calibration
+#'       statistic. Present whenever at least one horizon-varying metric or
+#'       `"calib_measures"` was requested.}
+#'     \item{`scalar_metrics`}{Data frame with columns `cause` and one column
+#'       per requested scalar metric. Present only when `"cindex_rmlt"` is
+#'       requested.}
+#'     \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
+#'       one per `pred_horizons` value. Present only when `"calib_measures"`
+#'       is requested.}
+#'   }
+#'   When `collapse_as_df = FALSE`, a named list with one element per
+#'   requested metric, each being a named list with one entry per cause.
 #' @export
 compute_metrics <- function(cr,
                             cif           = NULL,
@@ -131,7 +149,7 @@ compute_metrics <- function(cr,
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
   .check_cr(cr)
-
+  
   valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
                      "cindex_rmlt", "calib_measures")
   bad_metrics <- setdiff(metrics, valid_metrics)
@@ -141,9 +159,9 @@ compute_metrics <- function(cr,
       paste(bad_metrics, collapse = ", "),
       paste(valid_metrics, collapse = ", ")
     ), call. = FALSE)
-
+  
   needs_pred_horizons <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                             "calib_measures") %in% metrics)
+                               "calib_measures") %in% metrics)
   if (needs_pred_horizons && is.null(pred_horizons))
     stop(
       '`pred_horizons` must be provided when any of "Brier", "IBS", "tdAUC", ',
@@ -157,12 +175,12 @@ compute_metrics <- function(cr,
     if (is.unsorted(pred_horizons))
       stop("`pred_horizons` must be sorted in ascending order.", call. = FALSE)
   }
-
+  
   cif               <- .resolve_cif(cif, fit, cif_time_grid, cr)
   unpacked          <- .validate_and_unpack_cif(cif, cr)
   cif_time_grid     <- unpacked$time_grid
   cif               <- unpacked$cif
-
+  
   # Merge user-supplied args over defaults
   rr_args   <- modifyList(
     list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
@@ -173,17 +191,17 @@ compute_metrics <- function(cr,
     args_pec
   )
   rmlt_args <- modifyList(list(maxT = NULL), args_rmlt)
-
+  
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
-
+  
   # Build a Hist() formula for pec::cindex(); environment must be set to
   # prodlim so that Hist() resolves correctly inside riskRegression/pec calls.
   f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
   environment(f) <- asNamespace("prodlim")
-
+  
   comp_brier     <- "Brier"          %in% metrics
   comp_ibs       <- "IBS"            %in% metrics
   comp_auc       <- "tdAUC"          %in% metrics
@@ -195,7 +213,7 @@ compute_metrics <- function(cr,
     )
   comp_cidx_rmlt <- "cindex_rmlt"    %in% metrics
   comp_calib     <- "calib_measures" %in% metrics
-
+  
   if (is.null(pec_args$eval.times) && (comp_cidx_t || comp_cidx_rmlt)) {
     pec_args$eval.times <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
     message(
@@ -205,7 +223,7 @@ compute_metrics <- function(cr,
       "unstable near the end of follow-up — consider supplying a lower value."
     )
   }
-
+  
   # IBS requires Brier from riskRegression; always request "brier" when either
   # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
   # expected strings.
@@ -215,10 +233,10 @@ compute_metrics <- function(cr,
     if (comp_auc)      "auc"
   )
   rr_summary <- if (comp_ibs) "ibs" else character(0)
-
+  
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), cause_nms) else NULL
-
+  
   Brier          <- named_list(comp_brier)
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
@@ -226,7 +244,7 @@ compute_metrics <- function(cr,
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
   calib_graphs   <- named_list(comp_calib)
-
+  
   if (comp_cidx_rmlt) {
     rmlt <- do.call(compute_rmlt, c(
       list(cr  = cr,
@@ -234,7 +252,7 @@ compute_metrics <- function(cr,
       rmlt_args
     ))
   }
-
+  
   # Map each pred_horizons value to the nearest point on the CIF time grid.
   # riskRegression::Score and pec::cindex expect predictions whose columns
   # correspond exactly to the evaluation times supplied; by subsetting the CIF
@@ -257,14 +275,14 @@ compute_metrics <- function(cr,
                     snap_diffs[snap_diffs > snap_tol]),
             collapse = "\n")
     ), call. = FALSE)
-
+  
   for (k in causes) {
     i      <- which(causes == k)
     nm     <- cause_nms[i]
     M      <- cif[, i, snap_idx, drop = FALSE]   # [n, length(pred_horizons)]
     dim(M) <- c(nrow(M), length(snap_idx))        # ensure matrix even for n=1
     preds  <- stats::setNames(list(M), nm)
-
+    
     if (length(rr_metrics) > 0) {
       sc <- do.call(riskRegression::Score, c(
         list(object  = preds,
@@ -277,11 +295,19 @@ compute_metrics <- function(cr,
              null.model = FALSE),
         rr_args
       ))
-      if (comp_brier) Brier[[nm]] <- sc$Brier$score[sc$Brier$score$model == nm, "Brier"]
-      if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[sc$Brier$score$model == nm, "IBS"]
-      if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[sc$AUC$score$model == nm,     "AUC"]
+      brier_sc <- as.data.frame(sc$Brier$score)
+      brier_sc <- brier_sc[brier_sc$model == nm & !is.na(brier_sc$times), ]
+      if (comp_brier) Brier[[nm]] <- stats::setNames(brier_sc$Brier, pred_horizons)
+      if (comp_ibs)   IBS[[nm]]   <- stats::setNames(brier_sc$IBS,   pred_horizons)
+      if (comp_auc) {
+        auc_sc <- as.data.frame(sc$AUC$score)
+        tdAUC[[nm]] <- stats::setNames(
+          auc_sc[auc_sc$model == nm, "AUC"],
+          pred_horizons
+        )
+      }
     }
-
+    
     if (comp_cidx_t) {
       pec_args_cidx_t <- modifyList(
         pec_args,
@@ -295,7 +321,7 @@ compute_metrics <- function(cr,
              cause   = k),
         pec_args_cidx_t
       ))
-      cindex_t_year[[nm]] <- cidx$AppCindex[[nm]]
+      cindex_t_year[[nm]] <- stats::setNames(cidx$AppCindex[[nm]], pred_horizons)
     }
     if (comp_cidx_rmlt) {
       preds_rmlt           <- as.matrix(rmlt[, i])
@@ -310,15 +336,16 @@ compute_metrics <- function(cr,
       ))
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
-
+    
   }
-
+  
   if (comp_calib) {
     cal <- .compute_calibration(
       cr              = cr,
       cif_arr         = cif,
       cif_time_grid   = cif_time_grid,
-      pred_horizons   = snapped_times,
+      pred_horizons   = pred_horizons,
+      snapped_times   = snapped_times,
       loess_smoothing = TRUE,
       graph           = TRUE
     )
@@ -327,7 +354,7 @@ compute_metrics <- function(cr,
       calib_graphs[[nm]]   <- cal$graphs[[nm]]
     }
   }
-
+  
   result <- Filter(Negate(is.null), list(
     Brier          = Brier,
     IBS            = IBS,
@@ -336,36 +363,68 @@ compute_metrics <- function(cr,
     cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures
   ))
-
+  
   # calib_graphs is always a named list (not collapsible) — kept separate
   if (comp_calib) result$calib_graphs <- calib_graphs
-
+  
   if (!collapse_as_df) return(result)
-
-  t_nms <- if (!is.null(pred_horizons)) paste0("pred_horizons_", seq_along(pred_horizons)) else character(0)
-
-  # Collapse all metrics except calib_graphs (plots cannot be data frames)
-  collapse_nms <- setdiff(names(result), "calib_graphs")
-  collapsed <- lapply(collapse_nms, function(metric_nm) {
-    lst <- result[[metric_nm]]
-    if (metric_nm == "cindex_rmlt") {
-      vals <- vapply(lst, as.numeric, numeric(1))
-      df   <- data.frame(value = vals, row.names = names(lst))
-    } else if (metric_nm == "calib_measures") {
-      df <- do.call(rbind, lapply(names(lst), function(nm) {
-        cbind(cause = nm, lst[[nm]])
-      }))
-      rownames(df) <- NULL
-    } else {
-      mat <- do.call(rbind, lapply(lst, as.numeric))
-      rownames(mat) <- names(lst)
-      df <- as.data.frame(mat)
-      colnames(df) <- t_nms
-    }
-    df
-  }) |> stats::setNames(collapse_nms)
-
+  
+  # All horizon-varying metrics (one value per pred_horizon per cause).
+  # Collapsed into a single long data frame: cause, pred_horizons, <metric cols>.
+  horizon_metric_nms <- intersect(names(result),
+                                  c("Brier", "IBS", "tdAUC", "cindex_t_year"))
+  if (length(horizon_metric_nms) > 0) {
+    cause_nms_present <- names(result[[horizon_metric_nms[1]]])
+    horizon_df <- do.call(rbind, lapply(cause_nms_present, function(cn) {
+      row <- data.frame(cause = cn, pred_horizons = pred_horizons)
+      for (mn in horizon_metric_nms)
+        row[[mn]] <- as.numeric(result[[mn]][[cn]])
+      row
+    }))
+    rownames(horizon_df) <- NULL
+    result[horizon_metric_nms] <- NULL
+  } else {
+    horizon_df <- NULL
+  }
+  
+  # calib_measures: named list per cause -> long data frame
+  if (!is.null(result$calib_measures)) {
+    lst <- result$calib_measures
+    calib_df <- do.call(rbind, lapply(names(lst), function(nm) {
+      cbind(cause = nm, lst[[nm]], row.names = NULL)
+    }))
+    rownames(calib_df) <- NULL
+    result$calib_measures <- NULL
+  } else {
+    calib_df <- NULL
+  }
+  
+  # Merge horizon-varying metrics and calibration into a single data frame,
+  # joining on cause + pred_horizons when both are present.
+  if (!is.null(horizon_df) && !is.null(calib_df)) {
+    result$metrics <- merge(horizon_df, calib_df,
+                            by = c("cause", "pred_horizons"), all = TRUE,
+                            sort = FALSE)
+  } else if (!is.null(horizon_df)) {
+    result$metrics <- horizon_df
+  } else if (!is.null(calib_df)) {
+    result$metrics <- calib_df
+  }
+  
+  # Scalar metrics (one value per cause): cause, <metric cols>.
+  scalar_metric_nms <- intersect(names(result), c("cindex_rmlt"))
+  if (length(scalar_metric_nms) > 0) {
+    cause_nms_present <- names(result[[scalar_metric_nms[1]]])
+    scalar_df <- data.frame(cause = cause_nms_present)
+    for (mn in scalar_metric_nms)
+      scalar_df[[mn]] <- vapply(result[[mn]], as.numeric, numeric(1))
+    rownames(scalar_df) <- NULL
+    result[scalar_metric_nms] <- NULL
+    result$scalar_metrics <- scalar_df
+  }
+  
   # Re-attach calib_graphs unchanged
-  if (comp_calib) collapsed$calib_graphs <- calib_graphs
-  collapsed
+  if (comp_calib) result$calib_graphs <- calib_graphs
+  
+  result
 }

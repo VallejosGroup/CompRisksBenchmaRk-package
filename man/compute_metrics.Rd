@@ -79,25 +79,43 @@ error is raised if any mapped difference exceeds this tolerance (default
 horizons that are far from the estimated time grid, or to `Inf` to
 disable the check entirely.}
 
-\item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
-the output list is collapsed into a data frame with one row per cause.
-For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
-columns correspond to `pred_horizons`.  For scalar metrics (`"IBS"`,
-`"cindex_rmlt"`), a single `value` column is used.  For
-`"calib_measures"`, the result is a data frame with columns `cause`,
-`pred_horizons`, and the calibration statistics (`ICI`, `E50`, `E90`,
-`Emax`, `RSB`), with one row per cause per prediction horizon.
-`calib_graphs` is always returned as a named list regardless of this
-setting.}
+\item{collapse_as_df}{Logical; if `TRUE` (default), metrics are collapsed
+into data frames:
+\describe{
+  \item{`metrics`}{A data frame with columns `cause`, `pred_horizons`,
+    and one column per requested horizon-varying metric (`"Brier"`,
+    `"IBS"`, `"tdAUC"`, `"cindex_t_year"`) and/or calibration statistic
+    (`ICI`, `E50`, `E90`, `Emax`, `RSB`, `OE`, `OE_lower`, `OE_upper`).
+    Horizon-varying metrics and calibration columns are joined on
+    `cause` + `pred_horizons`.}
+  \item{`scalar_metrics`}{A data frame with columns `cause` and one
+    column per requested scalar metric (`"cindex_rmlt"`). Only present
+    if a scalar metric was requested.}
+  \item{`calib_graphs`}{A named list (keyed by cause) of ggplot objects,
+    one per `pred_horizons` value. Always a list regardless of
+    `collapse_as_df`.}
+}
+When `collapse_as_df = FALSE`, each metric is returned as a named list
+with one entry per cause.}
 }
 \value{
-A named list with one element per requested metric.  When
-  `collapse_as_df = TRUE` (default), each element (except `calib_graphs`)
-  is a data frame with one row per cause.  When `collapse_as_df = FALSE`,
-  each element is itself a named list with one entry per cause.
-  `calib_graphs` is always a named list keyed by cause (e.g. `"cause_1"`),
-  each containing a list of ggplot objects — one per element of
-  `pred_horizons`.
+When `collapse_as_df = TRUE` (default), a named list with some
+  subset of the following elements, depending on which metrics were
+  requested:
+  \describe{
+    \item{`metrics`}{Data frame with columns `cause`, `pred_horizons`, and
+      one column per requested horizon-varying metric and/or calibration
+      statistic. Present whenever at least one horizon-varying metric or
+      `"calib_measures"` was requested.}
+    \item{`scalar_metrics`}{Data frame with columns `cause` and one column
+      per requested scalar metric. Present only when `"cindex_rmlt"` is
+      requested.}
+    \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
+      one per `pred_horizons` value. Present only when `"calib_measures"`
+      is requested.}
+  }
+  When `collapse_as_df = FALSE`, a named list with one element per
+  requested metric, each being a named list with one entry per cause.
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
