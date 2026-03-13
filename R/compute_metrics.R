@@ -130,7 +130,7 @@ compute_metrics <- function(cr,
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
   .check_cr(cr)
-  
+
   valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
                      "cindex_rmlt", "calib_measures")
   bad_metrics <- setdiff(metrics, valid_metrics)
@@ -140,9 +140,9 @@ compute_metrics <- function(cr,
       paste(bad_metrics, collapse = ", "),
       paste(valid_metrics, collapse = ", ")
     ), call. = FALSE)
-  
+
   needs_pred_horizons <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                               "calib_measures") %in% metrics)
+                             "calib_measures") %in% metrics)
   if (needs_pred_horizons && is.null(pred_horizons))
     stop(
       '`pred_horizons` must be provided when any of "Brier", "IBS", "tdAUC", ',
@@ -156,12 +156,12 @@ compute_metrics <- function(cr,
     if (is.unsorted(pred_horizons))
       stop("`pred_horizons` must be sorted in ascending order.", call. = FALSE)
   }
-  
+
   cif               <- .resolve_cif(cif, fit, cif_time_grid, cr)
   unpacked          <- .validate_and_unpack_cif(cif, cr)
   cif_time_grid     <- unpacked$time_grid
   cif               <- unpacked$cif
-  
+
   # Merge user-supplied args over defaults
   rr_args   <- modifyList(
     list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
@@ -172,17 +172,17 @@ compute_metrics <- function(cr,
     args_pec
   )
   rmlt_args <- modifyList(list(maxT = NULL), args_rmlt)
-  
+
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
-  
+
   # Build a Hist() formula for pec::cindex(); environment must be set to
   # prodlim so that Hist() resolves correctly inside riskRegression/pec calls.
   f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
   environment(f) <- asNamespace("prodlim")
-  
+
   comp_brier     <- "Brier"          %in% metrics
   comp_ibs       <- "IBS"            %in% metrics
   comp_auc       <- "tdAUC"          %in% metrics
@@ -194,7 +194,7 @@ compute_metrics <- function(cr,
     )
   comp_cidx_rmlt <- "cindex_rmlt"    %in% metrics
   comp_calib     <- "calib_measures" %in% metrics
-  
+
   if (is.null(pec_args$eval.times) && (comp_cidx_t || comp_cidx_rmlt)) {
     pec_args$eval.times <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
     message(
@@ -204,7 +204,7 @@ compute_metrics <- function(cr,
       "unstable near the end of follow-up — consider supplying a lower value."
     )
   }
-  
+
   # IBS requires Brier from riskRegression; always request "brier" when either
   # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
   # expected strings.
@@ -214,10 +214,10 @@ compute_metrics <- function(cr,
     if (comp_auc)      "auc"
   )
   rr_summary <- if (comp_ibs) "ibs" else character(0)
-  
+
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), cause_nms) else NULL
-  
+
   Brier          <- named_list(comp_brier)
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
@@ -225,7 +225,7 @@ compute_metrics <- function(cr,
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calib_measures <- named_list(comp_calib)
   calib_graphs   <- named_list(comp_calib)
-  
+
   if (comp_cidx_rmlt) {
     rmlt <- do.call(compute_rmlt, c(
       list(cr  = cr,
@@ -233,7 +233,7 @@ compute_metrics <- function(cr,
       rmlt_args
     ))
   }
-  
+
   # Map each pred_horizons value to the nearest point on the CIF time grid.
   # riskRegression::Score and pec::cindex expect predictions whose columns
   # correspond exactly to the evaluation times supplied; by subsetting the CIF
@@ -256,14 +256,14 @@ compute_metrics <- function(cr,
                     snap_diffs[snap_diffs > snap_tol]),
             collapse = "\n")
     ), call. = FALSE)
-  
+
   for (k in causes) {
     i      <- which(causes == k)
     nm     <- cause_nms[i]
     M      <- cif[, i, snap_idx, drop = FALSE]   # [n, length(pred_horizons)]
     dim(M) <- c(nrow(M), length(snap_idx))        # ensure matrix even for n=1
     preds  <- stats::setNames(list(M), nm)
-    
+
     if (length(rr_metrics) > 0) {
       sc <- do.call(riskRegression::Score, c(
         list(object  = preds,
@@ -280,7 +280,7 @@ compute_metrics <- function(cr,
       if (comp_ibs)   IBS[[nm]]   <- sc$Brier$score[sc$Brier$score$model == nm, "IBS"]
       if (comp_auc)   tdAUC[[nm]] <- sc$AUC$score[sc$AUC$score$model == nm,     "AUC"]
     }
-    
+
     if (comp_cidx_t) {
       pec_args_cidx_t <- modifyList(
         pec_args,
@@ -309,15 +309,15 @@ compute_metrics <- function(cr,
       ))
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
-    
+
   }
-  
+
   if (comp_calib) {
     cal <- .compute_calibration(
       cr              = cr,
-      cif             = list(cif = cif, time_grid = cif_time_grid,
-                             model_key = cause_nms[1]),
-      horizon         = pred_horizons,
+      cif_arr         = cif,
+      cif_time_grid   = cif_time_grid,
+      pred_horizons   = snapped_times,
       loess_smoothing = TRUE,
       graph           = TRUE
     )
@@ -326,7 +326,7 @@ compute_metrics <- function(cr,
       calib_graphs[[nm]]   <- cal$graphs[[nm]]
     }
   }
-  
+
   result <- Filter(Negate(is.null), list(
     Brier          = Brier,
     IBS            = IBS,
@@ -335,14 +335,14 @@ compute_metrics <- function(cr,
     cindex_rmlt    = cindex_rmlt,
     calib_measures = calib_measures
   ))
-  
+
   # calib_graphs is always a named list (not collapsible) — kept separate
   if (comp_calib) result$calib_graphs <- calib_graphs
-  
+
   if (!collapse_as_df) return(result)
-  
+
   t_nms <- if (!is.null(pred_horizons)) paste0("pred_horizons_", seq_along(pred_horizons)) else character(0)
-  
+
   # Collapse all metrics except calib_graphs (plots cannot be data frames)
   collapse_nms <- setdiff(names(result), "calib_graphs")
   collapsed <- lapply(collapse_nms, function(metric_nm) {
@@ -363,7 +363,7 @@ compute_metrics <- function(cr,
     }
     df
   }) |> stats::setNames(collapse_nms)
-  
+
   # Re-attach calib_graphs unchanged
   if (comp_calib) collapsed$calib_graphs <- calib_graphs
   collapsed

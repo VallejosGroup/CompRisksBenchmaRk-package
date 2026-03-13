@@ -270,18 +270,17 @@ NULL
 #' Compute calibration plots and measures for all competing causes
 #'
 #' Internal function producing pseudo-value calibration plots and numerical
-#' calibration measures for all causes in a [cr_data()] object.
+#' calibration measures for all causes in a [cr_data()] object.  Called
+#' exclusively from [compute_metrics()], which resolves and unpacks the CIF
+#' before passing it here.
 #'
 #' @param cr            A [cr_data()] object.
-#' @param cif           A list as returned by [predict_cif()].
-#'   Mutually exclusive with `fit`.
-#' @param fit           A fitted model object. Mutually exclusive with `cif`.
-#' @param cif_time_grid Numeric time grid; required when `fit` is supplied,
-#'   must be `NULL` when `cif` is supplied.
-#' @param horizon       Numeric scalar or vector of evaluation times (sorted,
-#'   no NAs).  Values should already be snapped to the CIF time grid by the
-#'   caller (e.g. via [compute_metrics()]); internally the nearest grid index
-#'   is used for each element.
+#' @param cif_arr       Numeric array `[n, K, Tm]` of CIF predictions, as
+#'   unpacked by `.validate_and_unpack_cif()`.
+#' @param cif_time_grid Numeric vector of time points corresponding to the
+#'   third dimension of `cif_arr`.
+#' @param pred_horizons Numeric vector of prediction horizons (sorted, no NAs).
+#'   Values must already be snapped to `cif_time_grid` by the caller.
 #' @param loess_smoothing Logical; use LOESS smoothing (default `TRUE`).
 #' @param bandwidth     Optional bandwidth for nearest-neighbour smoothing.
 #' @param graph         Logical; produce ggplot objects? (default `TRUE`).
@@ -290,31 +289,20 @@ NULL
 #'   `OE_summary`.
 #' @noRd
 .compute_calibration <- function(cr,
-                                  cif           = NULL,
-                                  fit           = NULL,
-                                  cif_time_grid = NULL,
-                                  horizon,
+                                  cif_arr,
+                                  cif_time_grid,
+                                  pred_horizons,
                                   loess_smoothing = TRUE,
                                   bandwidth       = NULL,
                                   graph           = TRUE) {
-  .check_cr(cr)
 
-  if (missing(horizon) || !is.numeric(horizon) || length(horizon) == 0)
-    stop("`horizon` must be a non-empty numeric vector.", call. = FALSE)
-  if (anyNA(horizon) || is.unsorted(horizon))
-    stop("`horizon` must be sorted and contain no NA values.", call. = FALSE)
-
-  cif_in     <- .resolve_cif(cif, fit, cif_time_grid, cr)
-  unpacked   <- .validate_and_unpack_cif(cif_in, cr)
-  cif_arr    <- unpacked$cif
-  model_name <- unpacked$model_key
-  time_grid  <- unpacked$time_grid
-
-  map_horizon_to_grid <- vapply(
-    horizon,
-    function(h) which.min(abs(time_grid - h)),
-    integer(1)
-  )
+  horizon_idx <- match(pred_horizons, cif_time_grid)
+  if (anyNA(horizon_idx))
+    stop(
+      "`pred_horizons` contains values not found in the CIF time grid. ",
+      "Ensure `pred_horizons` are snapped to the grid before calling this function.",
+      call. = FALSE
+    )
 
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
@@ -335,19 +323,18 @@ NULL
     k        <- causes[i]
     cause_nm <- cause_nms[i]
 
-    # Extract predicted CIF for this cause at the mapped horizon indices.
-    # cif_arr is [n, K, Tm]; indexing the K and Tm dims gives [n, 1, length(horizon)],
-    # which is then squeezed to [n, length(horizon)].
-    cif_at_horizon <- cif_arr[, i, map_horizon_to_grid, drop = FALSE][, 1, , drop = FALSE]
-    dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(horizon))
+    # Extract predicted CIF for this cause at the pre-snapped horizon indices.
+    # cif_arr is [n, K, Tm]; result is squeezed to [n, length(pred_horizons)].
+    cif_at_horizon <- cif_arr[, i, horizon_idx, drop = FALSE][, 1, , drop = FALSE]
+    dim(cif_at_horizon) <- c(dim(cif_arr)[1], length(pred_horizons))
 
     res <- .compute_calibration_per_cause(
       pred_at_tau     = cif_at_horizon,
-      tau             = horizon,
+      tau             = pred_horizons,
       cause           = k,
       cause_idx       = i,
       cause_nm        = cause_nm,
-      model_name      = model_name,
+      model_name      = cause_nm,
       time            = time,
       status          = status,
       cens_code       = cens_code,
