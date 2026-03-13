@@ -160,7 +160,7 @@ compute_metrics <- function(cr,
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
   .check_cr(cr)
-  
+
   valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
                      "cindex_rmlt", "calibration")
   bad_metrics <- setdiff(metrics, valid_metrics)
@@ -170,9 +170,9 @@ compute_metrics <- function(cr,
       paste(bad_metrics, collapse = ", "),
       paste(valid_metrics, collapse = ", ")
     ), call. = FALSE)
-  
+
   needs_pred_horizons <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                               "calibration") %in% metrics)
+                             "calibration") %in% metrics)
   if (needs_pred_horizons && is.null(pred_horizons))
     stop(
       '`pred_horizons` must be provided when any of "Brier", "IBS", "tdAUC", ',
@@ -186,10 +186,10 @@ compute_metrics <- function(cr,
     if (is.unsorted(pred_horizons))
       stop("`pred_horizons` must be sorted in ascending order.", call. = FALSE)
   }
-  
+
   if (!is.numeric(snap_tol) || length(snap_tol) != 1 || is.na(snap_tol) || snap_tol < 0)
     stop("`snap_tol` must be a single non-negative numeric value.", call. = FALSE)
-  
+
   valid_calib_args <- c("loess_smoothing", "bandwidth", "graph")
   bad_calib_args   <- setdiff(names(args_calibration), valid_calib_args)
   if (length(bad_calib_args) > 0)
@@ -197,12 +197,31 @@ compute_metrics <- function(cr,
       "Unrecognised element(s) in `args_calibration` will be ignored: %s. ",
       paste(bad_calib_args, collapse = ", ")
     ), call. = FALSE)
-  
+  if (!is.null(args_calibration$loess_smoothing) &&
+      (!is.logical(args_calibration$loess_smoothing) ||
+       length(args_calibration$loess_smoothing) != 1 ||
+       is.na(args_calibration$loess_smoothing)))
+    stop("`args_calibration$loess_smoothing` must be a single non-NA logical.",
+         call. = FALSE)
+  if (!is.null(args_calibration$graph) &&
+      (!is.logical(args_calibration$graph) ||
+       length(args_calibration$graph) != 1 ||
+       is.na(args_calibration$graph)))
+    stop("`args_calibration$graph` must be a single non-NA logical.",
+         call. = FALSE)
+  if (!is.null(args_calibration$bandwidth) &&
+      (!is.numeric(args_calibration$bandwidth) ||
+       length(args_calibration$bandwidth) != 1 ||
+       is.na(args_calibration$bandwidth) ||
+       args_calibration$bandwidth <= 0))
+    stop("`args_calibration$bandwidth` must be a single positive numeric.",
+         call. = FALSE)
+
   cif               <- .resolve_cif(cif, fit, cif_time_grid, cr)
   unpacked          <- .validate_and_unpack_cif(cif, cr)
   cif_time_grid     <- unpacked$time_grid
   cif               <- unpacked$cif
-  
+
   # Merge user-supplied args over defaults
   rr_args   <- modifyList(
     list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
@@ -217,17 +236,17 @@ compute_metrics <- function(cr,
     list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE),
     args_calibration
   )
-  
+
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
   cause_nms <- paste0("cause_", causes)
-  
+
   # Build a Hist() formula for pec::cindex(); environment must be set to
   # prodlim so that Hist() resolves correctly inside riskRegression/pec calls.
   f <- stats::as.formula(sprintf("Hist(%s,%s) ~ 1", time_var, event_var))
   environment(f) <- asNamespace("prodlim")
-  
+
   comp_brier     <- "Brier"          %in% metrics
   comp_ibs       <- "IBS"            %in% metrics
   comp_auc       <- "tdAUC"          %in% metrics
@@ -239,7 +258,7 @@ compute_metrics <- function(cr,
     )
   comp_cidx_rmlt <- "cindex_rmlt"    %in% metrics
   comp_calib     <- "calibration" %in% metrics
-  
+
   if (is.null(pec_args$eval.times) && (comp_cidx_t || comp_cidx_rmlt)) {
     pec_args$eval.times <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
     message(
@@ -250,7 +269,7 @@ compute_metrics <- function(cr,
       "`args_pec$eval.times`."
     )
   }
-  
+
   # IBS requires Brier from riskRegression; always request "brier" when either
   # "Brier" or "IBS" is asked for. Translate user-facing names to riskRegression
   # expected strings.
@@ -260,10 +279,10 @@ compute_metrics <- function(cr,
     if (comp_auc)      "auc"
   )
   rr_summary <- if (comp_ibs) "ibs" else character(0)
-  
+
   named_list <- function(cond)
     if (cond) stats::setNames(vector("list", length(causes)), cause_nms) else NULL
-  
+
   Brier          <- named_list(comp_brier)
   IBS            <- named_list(comp_ibs)
   tdAUC          <- named_list(comp_auc)
@@ -271,7 +290,7 @@ compute_metrics <- function(cr,
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calibration <- named_list(comp_calib)
   calib_graphs   <- named_list(comp_calib)
-  
+
   if (comp_cidx_rmlt) {
     rmlt <- do.call(compute_rmlt, c(
       list(cr  = cr,
@@ -279,7 +298,7 @@ compute_metrics <- function(cr,
       rmlt_args
     ))
   }
-  
+
   if (!is.null(pred_horizons)) {
     # Warn if any pred_horizons lie outside the CIF time grid range.
     if (any(pred_horizons > max(cif_time_grid)))
@@ -294,7 +313,7 @@ compute_metrics <- function(cr,
         min(cif_time_grid),
         paste(pred_horizons[pred_horizons < min(cif_time_grid)], collapse = ", ")
       ), call. = FALSE)
-    
+
     # Map each pred_horizons value to the nearest point on the CIF time grid.
     # riskRegression::Score and pec::cindex expect predictions whose columns
     # correspond exactly to the evaluation times supplied; by subsetting the CIF
@@ -321,11 +340,11 @@ compute_metrics <- function(cr,
     snap_idx      <- NULL
     snapped_times <- NULL
   }
-  
+
   for (k in causes) {
     i  <- which(causes == k)
     nm <- cause_nms[i]
-    
+
     if (!is.null(snap_idx)) {
       M      <- cif[, i, snap_idx, drop = FALSE]   # [n, length(pred_horizons)]
       dim(M) <- c(nrow(M), length(snap_idx))        # ensure matrix even for n=1
@@ -333,7 +352,7 @@ compute_metrics <- function(cr,
     } else {
       preds <- NULL
     }
-    
+
     if (length(rr_metrics) > 0) {
       sc <- do.call(riskRegression::Score, c(
         list(object  = preds,
@@ -364,7 +383,7 @@ compute_metrics <- function(cr,
         )
       }
     }
-    
+
     if (comp_cidx_t) {
       pec_args_cidx_t <- modifyList(
         pec_args,
@@ -393,9 +412,9 @@ compute_metrics <- function(cr,
       ))
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
-    
+
   }
-  
+
   if (comp_calib) {
     cal <- .compute_calibration(
       cr              = cr,
@@ -412,7 +431,7 @@ compute_metrics <- function(cr,
       calib_graphs[[nm]]   <- cal$graphs[[nm]]
     }
   }
-  
+
   result <- Filter(Negate(is.null), list(
     Brier          = Brier,
     IBS            = IBS,
@@ -421,13 +440,13 @@ compute_metrics <- function(cr,
     cindex_rmlt    = cindex_rmlt,
     calibration = calibration
   ))
-  
+
   # calib_graphs is always a named list (not collapsible) — attached at the end
   if (!collapse_as_df) {
     if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
     return(result)
   }
-  
+
   # All horizon-varying metrics (one value per pred_horizon per cause).
   # Collapsed into a single long data frame: cause, pred_horizons, <metric cols>.
   horizon_metric_nms <- intersect(names(result),
@@ -445,7 +464,7 @@ compute_metrics <- function(cr,
   } else {
     horizon_df <- NULL
   }
-  
+
   # calibration: named list per cause -> long data frame
   if (!is.null(result$calibration)) {
     lst <- result$calibration
@@ -457,7 +476,7 @@ compute_metrics <- function(cr,
   } else {
     calib_df <- NULL
   }
-  
+
   # Merge horizon-varying metrics and calibration into a single data frame,
   # joining on cause + pred_horizons when both are present.
   if (!is.null(horizon_df) && !is.null(calib_df)) {
@@ -469,7 +488,7 @@ compute_metrics <- function(cr,
   } else if (!is.null(calib_df)) {
     result$metrics <- calib_df
   }
-  
+
   # Scalar metrics (one value per cause): cause, <metric cols>.
   scalar_metric_nms <- intersect(names(result), c("cindex_rmlt"))
   if (length(scalar_metric_nms) > 0) {
@@ -481,9 +500,9 @@ compute_metrics <- function(cr,
     result[scalar_metric_nms] <- NULL
     result$scalar_metrics <- scalar_df
   }
-  
+
   # Re-attach calib_graphs unchanged
   if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
-  
+
   result
 }
