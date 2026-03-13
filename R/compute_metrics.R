@@ -25,13 +25,13 @@
 #'   `"tdAUC"` (time-dependent AUC),
 #'   `"cindex_t_year"` (C-index via \pkg{pec}),
 #'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
-#'   `"calib_measures"` (calibration summary statistics).
+#'   `"calibration"` (calibration summary statistics).
 #'   Note: requesting `"IBS"` implicitly also computes `"Brier"`.
 #' @param pred_horizons Numeric vector of prediction horizons at which metrics
 #'   are evaluated (length `Tm`).  Each value is mapped to the nearest point
 #'   on the CIF time grid, so the CIF can be estimated at high resolution
 #'   independently of the evaluation horizons.  Required when any of
-#'   `"Brier"`, `"IBS"`, `"tdAUC"`, `"cindex_t_year"`, or `"calib_measures"`
+#'   `"Brier"`, `"IBS"`, `"tdAUC"`, `"cindex_t_year"`, or `"calibration"`
 #'   is requested.  Not needed when only `"cindex_rmlt"` is requested.
 #' @param args_riskRegression A named list of additional arguments passed to
 #'   `riskRegression::Score()`. Relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
@@ -49,6 +49,16 @@
 #'   `list(maxT = NULL)` (resolved to maximum observed event time inside
 #'   [compute_rmlt()]). Any element supplied here overrides the corresponding
 #'   default.
+#' @param args_calibration A named list of arguments passed to the internal
+#'   calibration routine. Relevant for `"calibration"`. Defaults:
+#'   `list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE)`. Any
+#'   element supplied here overrides the corresponding default.
+#'   `loess_smoothing` controls whether LOESS or nearest-neighbour smoothing
+#'   is used; `bandwidth` sets the bandwidth for nearest-neighbour smoothing
+#'   (ignored when `loess_smoothing = TRUE`); `graph` controls whether
+#'   calibration ggplot objects are produced (set to `FALSE` to skip plot
+#'   generation when only `calibration` statistics are needed; `calib_graphs`
+#'   will then be absent from the result).
 #' @param snap_tol Maximum allowable absolute difference between a
 #'   `pred_horizons` value and its nearest point on the CIF time grid.  An
 #'   error is raised if any mapped difference exceeds this tolerance (default
@@ -106,7 +116,7 @@
 #'     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
 #'     summary that does not depend on a specific time horizon.}
 #'
-#'   \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
+#'   \item{`"calibration"`}{Calibration summary statistics (ICI, E50, E90,
 #'     Emax, RSB) computed via an internal `.compute_calibration()` routine.
 #'     These quantify agreement between predicted CIF values and observed
 #'     event fractions at each evaluation time.  Calibration plots are
@@ -120,13 +130,13 @@
 #'     \item{`metrics`}{Data frame with columns `cause`, `pred_horizons`, and
 #'       one column per requested horizon-varying metric and/or calibration
 #'       statistic. Present whenever at least one horizon-varying metric or
-#'       `"calib_measures"` was requested.}
+#'       `"calibration"` was requested.}
 #'     \item{`scalar_metrics`}{Data frame with columns `cause` and one column
 #'       per requested scalar metric. Present only when `"cindex_rmlt"` is
 #'       requested.}
 #'     \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
-#'       one per `pred_horizons` value. Present only when `"calib_measures"`
-#'       is requested.}
+#'       one per `pred_horizons` value. Present only when `"calibration"`
+#'       is requested and `args_calibration$graph = TRUE` (the default).}
 #'   }
 #'   When `collapse_as_df = FALSE`, a named list with one element per
 #'   requested metric, each being a named list with one entry per cause.
@@ -144,12 +154,15 @@ compute_metrics <- function(cr,
                                                        splitMethod = "noPlan",
                                                        verbose     = FALSE),
                             args_rmlt           = list(maxT = NULL),
+                            args_calibration    = list(loess_smoothing = TRUE,
+                                                       bandwidth       = NULL,
+                                                       graph           = TRUE),
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
   .check_cr(cr)
   
   valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                     "cindex_rmlt", "calib_measures")
+                     "cindex_rmlt", "calibration")
   bad_metrics <- setdiff(metrics, valid_metrics)
   if (length(bad_metrics) > 0)
     stop(sprintf(
@@ -159,11 +172,11 @@ compute_metrics <- function(cr,
     ), call. = FALSE)
   
   needs_pred_horizons <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                               "calib_measures") %in% metrics)
+                               "calibration") %in% metrics)
   if (needs_pred_horizons && is.null(pred_horizons))
     stop(
       '`pred_horizons` must be provided when any of "Brier", "IBS", "tdAUC", ',
-      '"cindex_t_year", or "calib_measures" is requested.', call. = FALSE
+      '"cindex_t_year", or "calibration" is requested.', call. = FALSE
     )
   if (!is.null(pred_horizons)) {
     if (!is.numeric(pred_horizons) || length(pred_horizons) == 0)
@@ -173,6 +186,17 @@ compute_metrics <- function(cr,
     if (is.unsorted(pred_horizons))
       stop("`pred_horizons` must be sorted in ascending order.", call. = FALSE)
   }
+  
+  if (!is.numeric(snap_tol) || length(snap_tol) != 1 || is.na(snap_tol) || snap_tol < 0)
+    stop("`snap_tol` must be a single non-negative numeric value.", call. = FALSE)
+  
+  valid_calib_args <- c("loess_smoothing", "bandwidth", "graph")
+  bad_calib_args   <- setdiff(names(args_calibration), valid_calib_args)
+  if (length(bad_calib_args) > 0)
+    warning(sprintf(
+      "Unrecognised element(s) in `args_calibration` will be ignored: %s. ",
+      paste(bad_calib_args, collapse = ", ")
+    ), call. = FALSE)
   
   cif               <- .resolve_cif(cif, fit, cif_time_grid, cr)
   unpacked          <- .validate_and_unpack_cif(cif, cr)
@@ -188,7 +212,11 @@ compute_metrics <- function(cr,
     list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
     args_pec
   )
-  rmlt_args <- modifyList(list(maxT = NULL), args_rmlt)
+  rmlt_args  <- modifyList(list(maxT = NULL), args_rmlt)
+  calib_args <- modifyList(
+    list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE),
+    args_calibration
+  )
   
   time_var  <- cr@time_var
   event_var <- cr@event_var
@@ -210,7 +238,7 @@ compute_metrics <- function(cr,
       "for t-year predictions. Consider `cindex_rmlt` instead."
     )
   comp_cidx_rmlt <- "cindex_rmlt"    %in% metrics
-  comp_calib     <- "calib_measures" %in% metrics
+  comp_calib     <- "calibration" %in% metrics
   
   if (is.null(pec_args$eval.times) && (comp_cidx_t || comp_cidx_rmlt)) {
     pec_args$eval.times <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
@@ -241,7 +269,7 @@ compute_metrics <- function(cr,
   tdAUC          <- named_list(comp_auc)
   cindex_t_year  <- named_list(comp_cidx_t)
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
-  calib_measures <- named_list(comp_calib)
+  calibration <- named_list(comp_calib)
   calib_graphs   <- named_list(comp_calib)
   
   if (comp_cidx_rmlt) {
@@ -252,35 +280,59 @@ compute_metrics <- function(cr,
     ))
   }
   
-  # Map each pred_horizons value to the nearest point on the CIF time grid.
-  # riskRegression::Score and pec::cindex expect predictions whose columns
-  # correspond exactly to the evaluation times supplied; by subsetting the CIF
-  # array to the snapped indices we decouple the CIF time resolution from the
-  # evaluation times requested by the user.
-  snap_idx      <- vapply(pred_horizons,
-                          function(t) which.min(abs(cif_time_grid - t)),
-                          integer(1))
-  snapped_times <- cif_time_grid[snap_idx]
-  snap_diffs    <- abs(pred_horizons - snapped_times)
-  if (any(snap_diffs > snap_tol))
-    stop(sprintf(
-      paste0("The following `pred_horizons` values are more than `snap_tol` = %g ",
-             "away from the nearest CIF time grid point:\n%s\n",
-             "Adjust `pred_horizons`, increase `snap_tol`, or use a finer CIF time grid."),
-      snap_tol,
-      paste(sprintf("  %g (nearest grid point: %g, diff: %g)",
-                    pred_horizons[snap_diffs > snap_tol],
-                    snapped_times[snap_diffs > snap_tol],
-                    snap_diffs[snap_diffs > snap_tol]),
-            collapse = "\n")
-    ), call. = FALSE)
+  if (!is.null(pred_horizons)) {
+    # Warn if any pred_horizons lie outside the CIF time grid range.
+    if (any(pred_horizons > max(cif_time_grid)))
+      warning(sprintf(
+        "The following `pred_horizons` values exceed the maximum CIF time grid point (%g): %s. ",
+        max(cif_time_grid),
+        paste(pred_horizons[pred_horizons > max(cif_time_grid)], collapse = ", ")
+      ), call. = FALSE)
+    if (any(pred_horizons < min(cif_time_grid)))
+      warning(sprintf(
+        "The following `pred_horizons` values are below the minimum CIF time grid point (%g): %s. ",
+        min(cif_time_grid),
+        paste(pred_horizons[pred_horizons < min(cif_time_grid)], collapse = ", ")
+      ), call. = FALSE)
+    
+    # Map each pred_horizons value to the nearest point on the CIF time grid.
+    # riskRegression::Score and pec::cindex expect predictions whose columns
+    # correspond exactly to the evaluation times supplied; by subsetting the CIF
+    # array to the snapped indices we decouple the CIF time resolution from the
+    # evaluation times requested by the user.
+    snap_idx      <- vapply(pred_horizons,
+                            function(t) which.min(abs(cif_time_grid - t)),
+                            integer(1))
+    snapped_times <- cif_time_grid[snap_idx]
+    snap_diffs    <- abs(pred_horizons - snapped_times)
+    if (any(snap_diffs > snap_tol))
+      stop(sprintf(
+        paste0("The following `pred_horizons` values are more than `snap_tol` = %g ",
+               "away from the nearest CIF time grid point:\n%s\n",
+               "Adjust `pred_horizons`, increase `snap_tol`, or use a finer CIF time grid."),
+        snap_tol,
+        paste(sprintf("  %g (nearest grid point: %g, diff: %g)",
+                      pred_horizons[snap_diffs > snap_tol],
+                      snapped_times[snap_diffs > snap_tol],
+                      snap_diffs[snap_diffs > snap_tol]),
+              collapse = "\n")
+      ), call. = FALSE)
+  } else {
+    snap_idx      <- NULL
+    snapped_times <- NULL
+  }
   
   for (k in causes) {
-    i      <- which(causes == k)
-    nm     <- cause_nms[i]
-    M      <- cif[, i, snap_idx, drop = FALSE]   # [n, length(pred_horizons)]
-    dim(M) <- c(nrow(M), length(snap_idx))        # ensure matrix even for n=1
-    preds  <- stats::setNames(list(M), nm)
+    i  <- which(causes == k)
+    nm <- cause_nms[i]
+    
+    if (!is.null(snap_idx)) {
+      M      <- cif[, i, snap_idx, drop = FALSE]   # [n, length(pred_horizons)]
+      dim(M) <- c(nrow(M), length(snap_idx))        # ensure matrix even for n=1
+      preds  <- stats::setNames(list(M), nm)
+    } else {
+      preds <- NULL
+    }
     
     if (length(rr_metrics) > 0) {
       sc <- do.call(riskRegression::Score, c(
@@ -296,6 +348,12 @@ compute_metrics <- function(cr,
       ))
       brier_sc <- as.data.frame(sc$Brier$score)
       brier_sc <- brier_sc[brier_sc$model == nm & !is.na(brier_sc$times), ]
+      if (comp_ibs && is.null(brier_sc$IBS))
+        stop(sprintf(
+          "Expected an `IBS` column in riskRegression::Score output for cause %s but none found. ",
+          "This may indicate a version incompatibility with riskRegression.",
+          nm
+        ), call. = FALSE)
       if (comp_brier) Brier[[nm]] <- stats::setNames(brier_sc$Brier, pred_horizons)
       if (comp_ibs)   IBS[[nm]]   <- stats::setNames(brier_sc$IBS,   pred_horizons)
       if (comp_auc) {
@@ -345,11 +403,12 @@ compute_metrics <- function(cr,
       cif_time_grid   = cif_time_grid,
       pred_horizons   = pred_horizons,
       snapped_times   = snapped_times,
-      loess_smoothing = TRUE,
-      graph           = TRUE
+      loess_smoothing = calib_args$loess_smoothing,
+      bandwidth       = calib_args$bandwidth,
+      graph           = calib_args$graph
     )
     for (nm in cause_nms) {
-      calib_measures[[nm]] <- cal$calib_measures[[nm]]
+      calibration[[nm]] <- cal$calib_measures[[nm]]
       calib_graphs[[nm]]   <- cal$graphs[[nm]]
     }
   }
@@ -360,13 +419,14 @@ compute_metrics <- function(cr,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
     cindex_rmlt    = cindex_rmlt,
-    calib_measures = calib_measures
+    calibration = calibration
   ))
   
-  # calib_graphs is always a named list (not collapsible) — kept separate
-  if (comp_calib) result$calib_graphs <- calib_graphs
-  
-  if (!collapse_as_df) return(result)
+  # calib_graphs is always a named list (not collapsible) — attached at the end
+  if (!collapse_as_df) {
+    if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
+    return(result)
+  }
   
   # All horizon-varying metrics (one value per pred_horizon per cause).
   # Collapsed into a single long data frame: cause, pred_horizons, <metric cols>.
@@ -386,14 +446,14 @@ compute_metrics <- function(cr,
     horizon_df <- NULL
   }
   
-  # calib_measures: named list per cause -> long data frame
-  if (!is.null(result$calib_measures)) {
-    lst <- result$calib_measures
+  # calibration: named list per cause -> long data frame
+  if (!is.null(result$calibration)) {
+    lst <- result$calibration
     calib_df <- do.call(rbind, lapply(names(lst), function(nm) {
       cbind(cause = nm, lst[[nm]], row.names = NULL)
     }))
     rownames(calib_df) <- NULL
-    result$calib_measures <- NULL
+    result$calibration <- NULL
   } else {
     calib_df <- NULL
   }
@@ -423,7 +483,7 @@ compute_metrics <- function(cr,
   }
   
   # Re-attach calib_graphs unchanged
-  if (comp_calib) result$calib_graphs <- calib_graphs
+  if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
   
   result
 }

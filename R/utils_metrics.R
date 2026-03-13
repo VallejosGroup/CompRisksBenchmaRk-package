@@ -187,6 +187,11 @@ NULL
         ".compute_calibration: <5 non-missing points at tau=%g for cause %s.",
         eval_time, cause_nm
       ))
+      measures[[i]] <- data.frame(pred_horizons = eval_time,
+                                  ICI = NA, E50 = NA, E90 = NA,
+                                  Emax = NA, RSB = NA,
+                                  OE_df[i, , drop = FALSE],
+                                  row.names = NULL)
       next
     }
     pred_use   <- as.numeric(prediction[keep])
@@ -221,8 +226,8 @@ NULL
     measures[[i]] <- data.frame(
       pred_horizons = eval_time,
       ICI   = mean(abs(error), na.rm = TRUE),
-      E50   = suppressWarnings(stats::quantile(abs(error), 0.5, na.rm = TRUE)),
-      E90   = suppressWarnings(stats::quantile(abs(error), 0.9, na.rm = TRUE)),
+      E50   = stats::quantile(abs(error), 0.5, na.rm = TRUE),
+      E90   = stats::quantile(abs(error), 0.9, na.rm = TRUE),
       Emax  = max(abs(error), na.rm = TRUE),
       RSB   = sqrt(mean(error^2, na.rm = TRUE)),
       OE_df[i, , drop = FALSE],

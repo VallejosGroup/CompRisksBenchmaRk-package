@@ -14,6 +14,7 @@ compute_metrics(
   args_riskRegression = list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
   args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
   args_rmlt = list(maxT = NULL),
+  args_calibration = list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE),
   snap_tol = 0.1,
   collapse_as_df = TRUE
 )
@@ -41,14 +42,14 @@ is then taken from `cif$time_grid`).}
 `"tdAUC"` (time-dependent AUC),
 `"cindex_t_year"` (C-index via \pkg{pec}),
 `"cindex_rmlt"` (C-index via restricted mean lifetime),
-`"calib_measures"` (calibration summary statistics).
+`"calibration"` (calibration summary statistics).
 Note: requesting `"IBS"` implicitly also computes `"Brier"`.}
 
 \item{pred_horizons}{Numeric vector of prediction horizons at which metrics
 are evaluated (length `Tm`).  Each value is mapped to the nearest point
 on the CIF time grid, so the CIF can be estimated at high resolution
 independently of the evaluation horizons.  Required when any of
-`"Brier"`, `"IBS"`, `"tdAUC"`, `"cindex_t_year"`, or `"calib_measures"`
+`"Brier"`, `"IBS"`, `"tdAUC"`, `"cindex_t_year"`, or `"calibration"`
 is requested.  Not needed when only `"cindex_rmlt"` is requested.}
 
 \item{args_riskRegression}{A named list of additional arguments passed to
@@ -69,6 +70,17 @@ truncation; when `NULL`, defaults to the maximum observed event time in
 `list(maxT = NULL)` (resolved to maximum observed event time inside
 [compute_rmlt()]). Any element supplied here overrides the corresponding
 default.}
+
+\item{args_calibration}{A named list of arguments passed to the internal
+calibration routine. Relevant for `"calibration"`. Defaults:
+`list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE)`. Any
+element supplied here overrides the corresponding default.
+`loess_smoothing` controls whether LOESS or nearest-neighbour smoothing
+is used; `bandwidth` sets the bandwidth for nearest-neighbour smoothing
+(ignored when `loess_smoothing = TRUE`); `graph` controls whether
+calibration ggplot objects are produced (set to `FALSE` to skip plot
+generation when only `calibration` statistics are needed; `calib_graphs`
+will then be absent from the result).}
 
 \item{snap_tol}{Maximum allowable absolute difference between a
 `pred_horizons` value and its nearest point on the CIF time grid.  An
@@ -104,13 +116,13 @@ When `collapse_as_df = TRUE` (default), a named list with some
     \item{`metrics`}{Data frame with columns `cause`, `pred_horizons`, and
       one column per requested horizon-varying metric and/or calibration
       statistic. Present whenever at least one horizon-varying metric or
-      `"calib_measures"` was requested.}
+      `"calibration"` was requested.}
     \item{`scalar_metrics`}{Data frame with columns `cause` and one column
       per requested scalar metric. Present only when `"cindex_rmlt"` is
       requested.}
     \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
-      one per `pred_horizons` value. Present only when `"calib_measures"`
-      is requested.}
+      one per `pred_horizons` value. Present only when `"calibration"`
+      is requested and `args_calibration$graph = TRUE` (the default).}
   }
   When `collapse_as_df = FALSE`, a named list with one element per
   requested metric, each being a named list with one entry per cause.
@@ -155,7 +167,7 @@ cause:
     summary scores to `pec::cindex()`.  Useful as a scalar discrimination
     summary that does not depend on a specific time horizon.}
 
-  \item{`"calib_measures"`}{Calibration summary statistics (ICI, E50, E90,
+  \item{`"calibration"`}{Calibration summary statistics (ICI, E50, E90,
     Emax, RSB) computed via an internal `.compute_calibration()` routine.
     These quantify agreement between predicted CIF values and observed
     event fractions at each evaluation time.  Calibration plots are
