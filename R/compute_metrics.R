@@ -40,11 +40,10 @@
 #' @param args_pec A named list of additional arguments passed to
 #'   `pec::cindex()`. Relevant for `"cindex_t_year"` and `"cindex_rmlt"`.
 #'   Defaults: `list(cens.model = "marginal", splitMethod = "noPlan",
-#'   verbose = FALSE, eval.times = NULL)`. Any element supplied here overrides
-#'   the corresponding default.  `eval.times` controls the time horizon used
-#'   for IPCW weight truncation in C-index estimation; when `NULL` it defaults
-#'   to the maximum observed event time in `cr` and a message is issued, as
-#'   IPCW weights are unstable near the end of follow-up.
+#'   verbose = FALSE)`. Any element supplied here overrides the corresponding
+#'   default. `eval.times` controls the time horizon used for IPCW weight
+#'   truncation; when `NULL`, defaults to the maximum observed event time in
+#'   `cr` and a message is issued.
 #' @param args_rmlt A named list of additional arguments passed to
 #'   [compute_rmlt()]. Relevant for `"cindex_rmlt"`. Defaults:
 #'   `list(maxT = NULL)` (resolved to maximum observed event time inside
@@ -143,8 +142,7 @@ compute_metrics <- function(cr,
                                                        se.fit      = FALSE),
                             args_pec            = list(cens.model  = "marginal",
                                                        splitMethod = "noPlan",
-                                                       verbose     = FALSE,
-                                                       eval.times  = NULL),
+                                                       verbose     = FALSE),
                             args_rmlt           = list(maxT = NULL),
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
@@ -220,7 +218,8 @@ compute_metrics <- function(cr,
       "`args_pec$eval.times` not supplied; defaulting to the maximum observed ",
       "event time (", round(pec_args$eval.times, 4), "). This affects C-index ",
       "estimates (`cindex_t_year` and `cindex_rmlt`) only. IPCW weights are ",
-      "unstable near the end of follow-up — consider supplying a lower value."
+      "unstable near the end of follow-up — consider supplying a value via ",
+      "`args_pec$eval.times`."
     )
   }
   
