@@ -6,14 +6,14 @@
 \usage{
 compute_metrics(
   cr,
-  eval_times = NULL,
   cif = NULL,
   fit = NULL,
   cif_time_grid = NULL,
   metrics = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
-  tau = NULL,
+  pred_horizons = NULL,
   args_riskRegression = list(cens.method = "ipcw", cens.model = "km", se.fit = FALSE),
-  args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
+  args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE,
+    eval.times = NULL),
   args_rmlt = list(maxT = NULL),
   collapse_as_df = TRUE
 )
@@ -21,12 +21,6 @@ compute_metrics(
 \arguments{
 \item{cr}{A [cr_data()] object providing the test-set outcomes, time
 and event variable names, and cause codes.}
-
-\item{eval_times}{Numeric vector of evaluation times for the metrics (length
-`Tm`). Required when any of `"Brier"`, `"IBS"`, `"tdAUC"`,
-`"cindex_t_year"`, or `"calib_measures"` is requested. Not needed when
-only `"cindex_rmlt"` is requested, as that metric operates on the CIF
-time grid directly.}
 
 \item{cif}{A list as returned by [predict_cif()], with elements
 `$cif` (3-D numeric array `[n, K, Tm]`) and `$time_grid` (numeric vector).
@@ -50,13 +44,12 @@ is then taken from `cif$time_grid`).}
 `"calib_measures"` (calibration summary statistics).
 Note: requesting `"IBS"` implicitly also computes `"Brier"`.}
 
-\item{tau}{Numeric scalar passed as `eval.times` to `pec::cindex()`
-for `"cindex_t_year"` and `"cindex_rmlt"`.  Defaults to the maximum
-observed event time in `cr` when either of those metrics is requested.
-A message is issued when the default is used, as IPCW weights become
-unstable near the end of follow-up; supplying a lower value is
-recommended.  Ignored when neither `"cindex_t_year"` nor `"cindex_rmlt"`
-is in `metrics`.}
+\item{pred_horizons}{Numeric vector of prediction horizons at which metrics
+are evaluated (length `Tm`).  Each value is mapped to the nearest point
+on the CIF time grid, so the CIF can be estimated at high resolution
+independently of the evaluation horizons.  Required when any of
+`"Brier"`, `"IBS"`, `"tdAUC"`, `"cindex_t_year"`, or `"calib_measures"`
+is requested.  Not needed when only `"cindex_rmlt"` is requested.}
 
 \item{args_riskRegression}{A named list of additional arguments passed to
 `riskRegression::Score()`. Relevant for `"Brier"`, `"IBS"`, and `"tdAUC"`.
@@ -66,8 +59,11 @@ Any element supplied here overrides the corresponding default.}
 \item{args_pec}{A named list of additional arguments passed to
 `pec::cindex()`. Relevant for `"cindex_t_year"` and `"cindex_rmlt"`.
 Defaults: `list(cens.model = "marginal", splitMethod = "noPlan",
-verbose = FALSE)`. Any element supplied here overrides the corresponding
-default.}
+verbose = FALSE, eval.times = NULL)`. Any element supplied here overrides
+the corresponding default.  `eval.times` controls the time horizon used
+for IPCW weight truncation in C-index estimation; when `NULL` it defaults
+to the maximum observed event time in `cr` and a message is issued, as
+IPCW weights are unstable near the end of follow-up.}
 
 \item{args_rmlt}{A named list of additional arguments passed to
 [compute_rmlt()]. Relevant for `"cindex_rmlt"`. Defaults:
@@ -78,7 +74,7 @@ default.}
 \item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
 the output list is collapsed into a data frame with one row per cause.
 For time-varying metrics (`"Brier"`, `"tdAUC"`, `"cindex_t_year"`),
-columns correspond to `eval_times`.  For scalar metrics (`"IBS"`,
+columns correspond to `pred_horizons`.  For scalar metrics (`"IBS"`,
 `"cindex_rmlt"`), a single `value` column is used.  For
 `"calib_measures"`, columns are the calibration statistics, with one row
 per cause per evaluation time and an additional `time` column.
@@ -92,7 +88,7 @@ A named list with one element per requested metric.  When
   each element is itself a named list with one entry per cause.
   `calib_graphs` is always a named list keyed by cause (e.g. `"cause_1"`),
   each containing a list of ggplot objects — one per element of
-  `eval_times`.
+  `pred_horizons`.
 }
 \description{
 Wraps `riskRegression::Score()`, `pec::cindex()`, and custom calibration
@@ -113,7 +109,7 @@ cause:
     discrimination.  Computed via `riskRegression::Score()`.}
 
   \item{`"IBS"`}{The integrated Brier score, summarising the time-dependent
-    Brier score into a single value by integration over `eval_times`.
+    Brier score into a single value by integration over `pred_horizons`.
     Requesting `"IBS"` implicitly triggers computation of `"Brier"` as well.
     Computed via `riskRegression::Score()`.}
 
