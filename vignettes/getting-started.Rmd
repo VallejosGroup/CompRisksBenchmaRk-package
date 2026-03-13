@@ -178,18 +178,20 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-scores_FGR   <- compute_metrics(cr, eval_times = time_grid[2:4], cif = cif_FGR,   tau = tau, 
-                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                                            "cindex_rmlt", "calib_measures"))
-scores_csCPH <- compute_metrics(cr, time_grid[2:4], cif = cif_csCPH, tau = tau, 
-                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                                            "cindex_rmlt", "calib_measures"))
-scores_RSF   <- compute_metrics(cr, time_grid[2:4], cif = cif_RSF,   tau = tau, 
-                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                                            "cindex_rmlt", "calib_measures"))
-scores_FGRP  <- compute_metrics(cr, time_grid[2:4], cif = cif_FGRP,  tau = tau, 
-                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                                            "cindex_rmlt", "calib_measures"))
+all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year", "cindex_rmlt", "calib_measures")
+
+scores_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = all_metrics,
+                                 pred_horizons = time_grid,
+                                 args_pec = list(eval.times = tau))
+scores_csCPH <- compute_metrics(cr, cif = cif_csCPH, metrics = all_metrics,
+                                 pred_horizons = time_grid,
+                                 args_pec = list(eval.times = tau))
+scores_RSF   <- compute_metrics(cr, cif = cif_RSF,   metrics = all_metrics,
+                                 pred_horizons = time_grid,
+                                 args_pec = list(eval.times = tau))
+scores_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = all_metrics,
+                                 pred_horizons = time_grid,
+                                 args_pec = list(eval.times = tau))
 
 # Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
 scores_FGR$IBS
@@ -200,7 +202,9 @@ For convenience, the same scoring can be obtained programmatically:
 
 ```{r scoring-lapply, eval = FALSE}
 scores <- lapply(cifs, function(cif)
-  compute_metrics(cr, time_grid, cif = cif, tau = tau)
+  compute_metrics(cr, cif = cif, metrics = all_metrics,
+                  pred_horizons = time_grid,
+                  args_pec = list(eval.times = tau))
 )
 
 # Compare IBS for cause 2 across models
@@ -213,20 +217,20 @@ sapply(scores, function(s) s$IBS["cause_2", "value"])
 
 Calibration measures (ICI, E50, E90, Emax, RSB) and O/E ratios are computed
 via `compute_metrics()` using the `"calib_measures"` metric.  Calibration is
-evaluated at each element of `eval_times` and returned for all competing
+evaluated at each element of `pred_horizons` and returned for all competing
 causes.
 
 ```{r calibration}
 horizon <- 5
 
-calib_FGR   <- compute_metrics(cr, eval_times = horizon, cif = cif_FGR,
-                                metrics = "calib_measures")
-calib_csCPH <- compute_metrics(cr, eval_times = horizon, cif = cif_csCPH,
-                                metrics = "calib_measures")
-calib_RSF   <- compute_metrics(cr, eval_times = horizon, cif = cif_RSF,
-                                metrics = "calib_measures")
-calib_FGRP  <- compute_metrics(cr, eval_times = horizon, cif = cif_FGRP,
-                                metrics = "calib_measures")
+calib_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = all_metrics,
+                                pred_horizons = horizon, args_pec = list(eval.times = tau))
+calib_csCPH <- compute_metrics(cr, cif = cif_csCPH, metrics = all_metrics,
+                                pred_horizons = horizon, args_pec = list(eval.times = tau))
+calib_RSF   <- compute_metrics(cr, cif = cif_RSF,   metrics = all_metrics,
+                                pred_horizons = horizon, args_pec = list(eval.times = tau))
+calib_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = all_metrics,
+                                pred_horizons = horizon, args_pec = list(eval.times = tau))
 
 # Calibration measures for FGR — all causes at the 5-year horizon
 calib_FGR$calib_measures
@@ -312,7 +316,7 @@ prevent data leakage. For MICE (`m > 1`), predictions are pooled across
 imputed datasets with `pool_cifs_mean()`.
 
 ```{r imputation, eval = FALSE}
-feature_cols <- cr@covars$covars_names
+feature_cols <- cr_metadata(cr)$feature_vars
 
 imp <- impute_split(
   train        = cr@data,
