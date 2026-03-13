@@ -178,12 +178,18 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-scores_FGR   <- compute_metrics(cr, time_grid, cif = cif_FGR,   tau = tau, 
+scores_FGR   <- compute_metrics(cr, eval_times = time_grid[2:4], cif = cif_FGR,   tau = tau, 
                                 metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
                                             "cindex_rmlt", "calib_measures"))
-scores_csCPH <- compute_metrics(cr, time_grid, cif = cif_csCPH, tau = tau)
-scores_RSF   <- compute_metrics(cr, time_grid, cif = cif_RSF,   tau = tau)
-scores_FGRP  <- compute_metrics(cr, time_grid, cif = cif_FGRP,  tau = tau)
+scores_csCPH <- compute_metrics(cr, time_grid[2:4], cif = cif_csCPH, tau = tau, 
+                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
+                                            "cindex_rmlt", "calib_measures"))
+scores_RSF   <- compute_metrics(cr, time_grid[2:4], cif = cif_RSF,   tau = tau, 
+                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
+                                            "cindex_rmlt", "calib_measures"))
+scores_FGRP  <- compute_metrics(cr, time_grid[2:4], cif = cif_FGRP,  tau = tau, 
+                                metrics = c("Brier", "IBS", "tdAUC", "cindex_t_year",
+                                            "cindex_rmlt", "calib_measures"))
 
 # Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
 scores_FGR$IBS
