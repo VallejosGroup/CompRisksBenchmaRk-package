@@ -61,32 +61,14 @@ methods::setClass("cr_data", representation(
 #'   error is raised when it is \code{0} (the default).
 #' @param cens_code   Numeric code denoting censored observations in
 #'   \code{event_var} (default \code{0}).  Coerced to integer internally.
-#' @param store       Logical; if \code{TRUE}, write the constructed object to
-#'   disk as two files: a Parquet file for \code{cr@data} and a JSON file for
-#'   all other slots (metadata).  Requires \code{store_dir} to be supplied
-#'   (default \code{FALSE}).
-#' @param store_dir   Path to an existing directory where files are written.
-#'   Required when \code{store = TRUE}; ignored otherwise.
-#' @param store_name  Optional character string used as a prefix for the
-#'   output file names.  Files are named
-#'   \code{<store_name>_data.parquet} and \code{<store_name>_metadata.json}.
-#'   If \code{NULL} (default), the names \code{cr_data.parquet} and
-#'   \code{cr_metadata.json} are used.
-#' @param store_overwrite Logical; if \code{FALSE} (default), an error is
-#'   raised when either output file already exists.  Set to \code{TRUE} to
-#'   allow overwriting.
 #'
 #' @return A \code{cr_data} S4 object.
 #' @export
 cr_data <- function(data, time_var, event_var,
-                    sort_by_time     = TRUE,
-                    id_var           = NULL,
-                    time_offset      = 0,
-                    cens_code        = 0,
-                    store            = FALSE,
-                    store_dir        = NULL,
-                    store_name       = NULL,
-                    store_overwrite  = FALSE) {
+                    sort_by_time = TRUE,
+                    id_var       = NULL,
+                    time_offset  = 0,
+                    cens_code    = 0) {
 
   # --- Input validation ---
   if (!is.data.frame(data))
@@ -183,62 +165,18 @@ cr_data <- function(data, time_var, event_var,
   # --- Cause and covariate extraction ---
   causes <- .cr_causes(data, event_var, cens_code)
 
-  # --- Store validation (before constructing object) ---
-  if (store) {
-    if (is.null(store_dir) || !nzchar(store_dir))
-      stop("`store_dir` must be supplied when `store = TRUE`.", call. = FALSE)
-    if (!dir.exists(store_dir))
-      stop(sprintf("`store_dir` '%s' does not exist.", store_dir), call. = FALSE)
-
-    prefix     <- if (!is.null(store_name)) store_name else "cr"
-    data_path  <- file.path(store_dir, paste0(prefix, "_data.parquet"))
-    meta_path  <- file.path(store_dir, paste0(prefix, "_metadata.json"))
-
-    existing <- c(data_path, meta_path)[file.exists(c(data_path, meta_path))]
-    if (length(existing) > 0 && !store_overwrite)
-      stop(
-        "The following file(s) already exist and would be overwritten:\n",
-        paste0("  ", existing, collapse = "\n"), "\n",
-        "Re-run with `store_overwrite = TRUE` to allow overwriting.",
-        call. = FALSE
-      )
-  }
-
-  cr <- methods::new("cr_data",
-    data         = data,
-    causes       = causes,
+  methods::new("cr_data",
+    data          = data,
+    causes        = causes,
     feature_vars  = feature_cols,
     feature_types = covars_types,
-    time_var     = time_var,
-    event_var    = event_var,
-    id_var       = id_var,
-    sort_by_time = sort_by_time,
-    time_offset  = time_offset,
-    cens_code    = cens_code
+    time_var      = time_var,
+    event_var     = event_var,
+    id_var        = id_var,
+    sort_by_time  = sort_by_time,
+    time_offset   = time_offset,
+    cens_code     = cens_code
   )
-
-  # --- Write to disk ---
-  if (store) {
-    arrow::write_parquet(cr@data, data_path)
-    jsonlite::write_json(
-      list(
-        causes       = as.integer(cr@causes),
-        feature_vars  = cr@feature_vars,
-        feature_types = cr@feature_types,
-        time_var     = cr@time_var,
-        event_var    = cr@event_var,
-        id_var       = cr@id_var,
-        sort_by_time = cr@sort_by_time,
-        time_offset  = cr@time_offset,
-        cens_code    = as.integer(cr@cens_code)
-      ),
-      path = meta_path,
-      pretty = TRUE,
-      auto_unbox = TRUE
-    )
-  }
-
-  cr
 }
 
 
@@ -315,6 +253,49 @@ methods::setMethod("show", "cr_data", function(object) {
 #' @param x A \code{cr_data} object.
 #' @export
 methods::setMethod("dim", "cr_data", function(x) dim(x@data))
+
+
+# ---- Accessor methods -------------------------------------------------------
+
+#' Accessor methods for \code{cr_data} objects
+#'
+#' \describe{
+#'   \item{\code{cr_get_data}}{Returns the data frame stored in the
+#'     \code{data} slot.}
+#'   \item{\code{cr_metadata}}{Returns a named list of all metadata slots
+#'     (\code{causes}, \code{feature_vars}, \code{feature_types},
+#'     \code{time_var}, \code{event_var}, \code{id_var},
+#'     \code{sort_by_time}, \code{time_offset}, \code{cens_code}).}
+#' }
+#'
+#' @param x A \code{cr_data} object.
+#' @return See individual descriptions above.
+#' @name cr_data-accessors
+NULL
+
+#' @rdname cr_data-accessors
+#' @export
+methods::setGeneric("cr_get_data", function(x) methods::standardGeneric("cr_get_data"))
+
+#' @rdname cr_data-accessors
+#' @export
+methods::setGeneric("cr_metadata", function(x) methods::standardGeneric("cr_metadata"))
+
+methods::setMethod("cr_get_data", "cr_data", function(x) x@data)
+
+methods::setMethod("cr_metadata", "cr_data", function(x) {
+  list(
+    causes        = x@causes,
+    feature_vars  = x@feature_vars,
+    feature_types = x@feature_types,
+    time_var      = x@time_var,
+    event_var     = x@event_var,
+    id_var        = x@id_var,
+    sort_by_time  = x@sort_by_time,
+    time_offset   = x@time_offset,
+    cens_code     = x@cens_code
+  )
+})
 
 
 #' Subset a cr_data object
