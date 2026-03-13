@@ -15,6 +15,7 @@ compute_metrics(
   args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE,
     eval.times = NULL),
   args_rmlt = list(maxT = NULL),
+  snap_tol = 0.1,
   collapse_as_df = TRUE
 )
 }
@@ -70,6 +71,13 @@ IPCW weights are unstable near the end of follow-up.}
 `list(maxT = NULL)` (resolved to maximum observed event time inside
 [compute_rmlt()]). Any element supplied here overrides the corresponding
 default.}
+
+\item{snap_tol}{Maximum allowable absolute difference between a
+`pred_horizons` value and its nearest point on the CIF time grid.  An
+error is raised if any mapped difference exceeds this tolerance (default
+`0.1`).  Set to a finite value to guard against accidentally passing
+horizons that are far from the estimated time grid, or to `Inf` to
+disable the check entirely.}
 
 \item{collapse_as_df}{Logical; if `TRUE` (default), each metric element in
 the output list is collapsed into a data frame with one row per cause.
