@@ -63,7 +63,7 @@ pbc2$time <- pbc2$time / 365.25             # days -> years
 pbc2$stage <- as.factor(                     # group stages 1-2 vs 3 vs 4
   ifelse(pbc2$stage %in% c(1, 2), "1-2", as.character(pbc2$stage))
 )
-feature_cols <- c("age", "stage", "bili", "albumin", "protime", "trt")
+feature_cols <- c("age", "stage", "bili", "albumin", "protime")
 pbc2 <- pbc2[, c("id", "time", "status", feature_cols)]
 pbc2         <- pbc2[complete.cases(pbc2), ]
 ```
@@ -178,7 +178,7 @@ cifs <- lapply(fits, function(fit)
 tau <- 8   # upper limit for C-index estimation; lower than max follow-up
            # to avoid IPCW instability
 
-all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year", "cindex_rmlt", "calib_measures")
+all_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year", "cindex_rmlt")
 
 scores_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = all_metrics,
                                  pred_horizons = time_grid,
@@ -193,9 +193,9 @@ scores_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = all_metrics,
                                  pred_horizons = time_grid,
                                  args_pec = list(eval.times = tau))
 
-# Quick inspection: IBS and time-specific Brier for cause 2 (FGR)
-scores_FGR$IBS
-scores_FGR$Brier
+# Quick inspection: metrics data frame and scalar metrics for FGR
+scores_FGR$metrics
+scores_FGR$scalar_metrics
 ```
 
 For convenience, the same scoring can be obtained programmatically:
@@ -207,8 +207,8 @@ scores <- lapply(cifs, function(cif)
                   args_pec = list(eval.times = tau))
 )
 
-# Compare IBS for cause 2 across models
-sapply(scores, function(s) s$IBS["cause_2", "value"])
+# Compare cindex_rmlt across models
+sapply(scores, function(s) s$scalar_metrics$cindex_rmlt)
 ```
 
 ---
@@ -216,24 +216,27 @@ sapply(scores, function(s) s$IBS["cause_2", "value"])
 ## 5  Calibration
 
 Calibration measures (ICI, E50, E90, Emax, RSB) and O/E ratios are computed
-via `compute_metrics()` using the `"calib_measures"` metric.  Calibration is
+via `compute_metrics()` using the `"calibration"` metric.  Calibration is
 evaluated at each element of `pred_horizons` and returned for all competing
 causes.
 
 ```{r calibration}
 horizon <- 5
 
-calib_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = all_metrics,
-                                pred_horizons = horizon, args_pec = list(eval.times = tau))
-calib_csCPH <- compute_metrics(cr, cif = cif_csCPH, metrics = all_metrics,
-                                pred_horizons = horizon, args_pec = list(eval.times = tau))
-calib_RSF   <- compute_metrics(cr, cif = cif_RSF,   metrics = all_metrics,
-                                pred_horizons = horizon, args_pec = list(eval.times = tau))
-calib_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = all_metrics,
-                                pred_horizons = horizon, args_pec = list(eval.times = tau))
+calib_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = "calibration",
+                                pred_horizons = horizon)
+calib_csCPH <- compute_metrics(cr, cif = cif_csCPH, metrics = "calibration",
+                                pred_horizons = horizon)
+calib_RSF   <- compute_metrics(cr, cif = cif_RSF,   metrics = "calibration",
+                                pred_horizons = horizon)
+calib_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = "calibration",
+                                pred_horizons = horizon)
 
 # Calibration measures for FGR — all causes at the 5-year horizon
-calib_FGR$calib_measures
+calib_FGR$metrics
+
+# Calibration plots for FGR
+calib_FGR$calib_graphs
 ```
 
 ---
