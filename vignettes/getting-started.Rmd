@@ -251,7 +251,7 @@ for (key in model_keys)
 
 pred_cols <- paste0("pred_", model_keys)
 
-du <- ClinicalUtility(
+du <- clinical_utility(
   data         = test_dca,
   outcome      = cr@event_var,
   ttoutcome    = cr@time_var,
