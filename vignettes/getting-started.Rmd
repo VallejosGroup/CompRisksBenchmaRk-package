@@ -245,11 +245,12 @@ calib_FGR$calib_graphs
 
 ```{r dca, fig.alt="Decision curve analysis for 5-year death risk"}
 # Add each model's 5-year cause-2 predictions as columns for DCA
+hi       <- which.min(abs(time_grid - horizon))   # index of horizon in time_grid
 test_dca <- cr@data
 for (key in model_keys)
   test_dca[[paste0("pred_", key)]] <- cifs[[key]]$cif[, 2, hi]
 
-pred_cols <- paste0("pred_", model_keys)
+pred_cols <- paste0("pred_", model_keys[-2])
 
 du <- clinical_utility(
   data         = test_dca,
