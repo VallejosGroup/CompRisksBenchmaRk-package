@@ -8,6 +8,8 @@ nested_cv_from_bench(
   out_dir = "../BenchResults",
   model_key,
   cif_time_grid,
+  metrics = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
+  pred_horizons = NULL,
   grid = NULL,
   seed = 123L,
   verbose = TRUE,
@@ -23,6 +25,9 @@ nested_cv_from_bench(
 
 \item{cif_time_grid}{Numeric vector of time points at which CIF predictions
 are evaluated.}
+
+\item{pred_horizons}{Numeric vector of prediction horizons passed to
+[compute_metrics()]. Defaults to `cif_time_grid` if `NULL`.}
 
 \item{grid}{For tunable models: a named list of hyperparameter
 sequences to be expanded via `tidyr::expand_grid()`.  Ignored for

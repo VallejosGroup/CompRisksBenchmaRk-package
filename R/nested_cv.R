@@ -26,6 +26,8 @@ NULL
 #'   [register_cr_model()].
 #' @param cif_time_grid Numeric vector of time points at which CIF predictions
 #'   are evaluated.
+#' @param pred_horizons Numeric vector of prediction horizons passed to
+#'   [compute_metrics()]. Defaults to `cif_time_grid` if `NULL`.
 #' @param grid      For tunable models: a named list of hyperparameter
 #'   sequences to be expanded via `tidyr::expand_grid()`.  Ignored for
 #'   models with `needs_tuning = FALSE`.
@@ -41,6 +43,8 @@ NULL
 nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                                  model_key,
                                  cif_time_grid,
+                                 metrics                = c("Brier", "IBS", "tdAUC", "cindex_rmlt"),
+                                 pred_horizons          = NULL,
                                  grid                   = NULL,
                                  seed                   = 123L,
                                  verbose                = TRUE,
@@ -64,6 +68,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
   causes    <- as.integer(cv_meta$causes)
   
   # Get information about the model and whether it requires tuning
+  if (is.null(pred_horizons)) pred_horizons <- cif_time_grid
   model_info <- get_cr_model(model_key)$info()
   has_grid   <- isTRUE(model_info$needs_tuning)
   
@@ -130,9 +135,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       cr_test <- cr_data(test, time_var = time_var, event_var = event_var, id_var = id_var)
       perf    <- compute_metrics(cr_test,
                                  cif           = pred,
-                                 pred_horizons = cif_time_grid,
-                                 metrics       = c("Brier", "IBS"),
-                                 collapse_as_df = FALSE)
+                                 pred_horizons = pred_horizons,
+                                 metrics       = metrics,
+                                 collapse_as_df = TRUE)
       
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
       save_cif_r(store_dir, cif = pred$cif, cif_time_grid = pred$time_grid,
@@ -142,9 +147,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         fold          = v,
         model_key     = model_key,
         cif_time_grid = cif_time_grid,
-        metrics       = list(causes    = causes,
-                             cause_bs  = perf$Brier,
-                             cause_ibs = perf$IBS)
+        metrics       = perf
       )
       if (verbose) cat("[outer", v, "] done (no tuning) \n")
       
@@ -198,7 +201,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           # Compute IBS on the pooled CIF for this inner fold
           perf_in <- compute_metrics(cr_val,
                                      cif           = cif_in,
-                                     pred_horizons = cif_time_grid,
+                                     pred_horizons = pred_horizons,
                                      metrics       = "IBS",
                                      collapse_as_df = FALSE)
           
@@ -307,17 +310,16 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       cr_test <- cr_data(test, time_var = time_var, event_var = event_var, id_var = id_var)
       perf    <- compute_metrics(cr_test,
                                  cif           = list(cif = pred, time_grid = cif_time_grid),
-                                 pred_horizons = cif_time_grid,
-                                 metrics       = "IBS",
-                                 collapse_as_df = FALSE)
+                                 pred_horizons = pred_horizons,
+                                 metrics       = metrics,
+                                 collapse_as_df = TRUE)
       
       results[[v]] <- list(
         fold          = v,
         model_key     = model_key,
         cif_time_grid = cif_time_grid,
         best_cfg      = best_cfg,
-        metrics       = list(causes    = causes,
-                             cause_ibs = perf$IBS)
+        metrics       = perf
       )
     }
   }
