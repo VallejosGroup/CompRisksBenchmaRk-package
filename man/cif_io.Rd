@@ -4,6 +4,5 @@
 \alias{cif_io}
 \title{CIF Array and Storage Utilities}
 \description{
-Functions for pooling, saving, and storing CIF prediction
-  arrays.
+Functions for saving and storing CIF prediction arrays.
 }

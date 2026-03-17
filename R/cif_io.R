@@ -1,26 +1,7 @@
 #' @title CIF Array and Storage Utilities
-#' @description Functions for pooling, saving, and storing CIF prediction
-#'   arrays.
+#' @description Functions for saving and storing CIF prediction arrays.
 #' @name cif_io
 NULL
-
-
-#' Pool a list of CIF arrays by taking the element-wise mean
-#'
-#' Used to combine predictions across multiple imputed datasets.
-#'
-#' @param cif_list A list of 3-D numeric arrays, each of dimension
-#'   `[n, K, Tm]`.
-#'
-#' @return A single 3-D array of the same dimensions.
-#' @export
-pool_cifs_mean <- function(cif_list) {
-  m      <- length(cif_list)
-  pooled <- cif_list[[1]]
-  if (m > 1)
-    for (i in 2:m) pooled <- pooled + cif_list[[i]]
-  pooled / m
-}
 
 
 
