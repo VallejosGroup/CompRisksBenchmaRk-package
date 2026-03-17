@@ -38,9 +38,11 @@ non-zero values found in \code{event_var}).}
 
 \item{\code{feature_vars}}{Character vector of feature column names.}
 
-\item{\code{feature_types}}{Character vector of original column types, parallel
-to \code{feature_vars} (one of \code{"logical"}, \code{"factor"},
-\code{"character"}, \code{"integer"}, \code{"numeric"}).}
+\item{\code{var_types}}{Named character vector of original column types.  Names
+are column names; values are one of \code{"logical"}, \code{"factor"},
+\code{"character"}, \code{"integer"}, \code{"numeric"}.  Covers
+\code{time_var}, \code{event_var}, \code{id_var}, and all feature columns
+(in that order).}
 
 \item{\code{time_var}}{Name of the time column.}
 
