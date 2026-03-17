@@ -2,21 +2,22 @@
 % Please edit documentation in R/create_nested_splits.R
 \name{create_nested_splits}
 \alias{create_nested_splits}
-\title{Create nested cross-validation splits and write them to disk}
+\title{Create nested cross-validation splits and optionally write them to disk}
 \usage{
 create_nested_splits(
   cr,
-  out_dir = NULL,
+  store_dir = NULL,
   outer_folds = 5,
   inner_folds = 3,
   seed = 123,
-  times
+  store = FALSE
 )
 }
 \arguments{
 \item{cr}{A [cr_data()] object.}
 
-\item{out_dir}{Path to the output directory (created if needed).}
+\item{store_dir}{Path to the output directory (created if needed).
+Required when `store = TRUE`.}
 
 \item{outer_folds}{Number of outer folds (default `5`).}
 
@@ -24,15 +25,23 @@ create_nested_splits(
 
 \item{seed}{Random seed for reproducibility.}
 
-\item{times}{Numeric vector of evaluation time points written to
-`times.json`.}
+\item{store}{Logical; if `TRUE` (default `FALSE`), write splits and
+manifest to `store_dir` in addition to returning the list.}
 }
 \value{
-Invisibly `TRUE`.
+A named list with one element per outer fold (named `outer_1`,
+  `outer_2`, …). Each element is a list with:
+  \describe{
+    \item{`train`}{Training data frame.}
+    \item{`test`}{Test data frame.}
+    \item{`inner`}{A named list with one element per inner fold
+      (`inner_1`, …), each containing `train_ids` and `val_ids` — character
+      vectors of `id_var` values for the inner training and validation sets.}
+  }
 }
 \description{
-Produces a directory hierarchy suitable for [nested_cv_from_bench()].
-Outer and inner folds are stratified by event status using
-[rsample::vfold_cv()].  Fold data are stored as Parquet files; inner
-fold indices are stored as JSON.
+Produces outer and inner folds stratified by event status using
+[rsample::vfold_cv()].  Always returns a list of splits; optionally also
+writes fold data as Parquet files and inner indices as JSON to a directory
+hierarchy suitable for [nested_cv_from_bench()].
 }
