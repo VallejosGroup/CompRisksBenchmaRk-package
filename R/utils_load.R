@@ -12,11 +12,11 @@ NULL
     cn <- var_names[[i]]
     if (!cn %in% names(df)) next
     df[[cn]] <- switch(var_types[[i]],
-      numeric   = as.numeric(df[[cn]]),
-      integer   = as.integer(df[[cn]]),
-      logical   = as.logical(df[[cn]]),
-      factor    = as.factor(df[[cn]]),
-      as.character(df[[cn]])
+                       numeric   = as.numeric(df[[cn]]),
+                       integer   = as.integer(df[[cn]]),
+                       logical   = as.logical(df[[cn]]),
+                       factor    = as.factor(df[[cn]]),
+                       as.character(df[[cn]])
     )
   }
   df
@@ -68,12 +68,12 @@ NULL
     dd <- list.dirs(inner_dir, recursive = FALSE, full.names = TRUE)
     dd[grepl("fold_[0-9]+$", basename(dd))]
   } else character(0L)
-
+  
   if (!length(inner_dirs))
     return(list(inner_dirs = inner_dirs, inner_data = list()))
-
+  
   inner_data <- vector("list", length(inner_dirs))
-
+  
   for (j in seq_along(inner_dirs)) {
     idir <- inner_dirs[j]
     if (file.exists(file.path(idir, "train_imp_1.parquet")) &&
@@ -92,13 +92,13 @@ NULL
     }
     idx_path <- file.path(idir, "indices.json")
     idx      <- jsonlite::fromJSON(idx_path, simplifyVector = TRUE)
-    tr_ids   <- as.character(idx$train_row_id)
-    va_ids   <- as.character(idx$val_row_id)
+    tr_ids   <- intersect(as.character(idx$train_row_id), rownames(outer_train_df))
+    va_ids   <- intersect(as.character(idx$val_row_id),   rownames(outer_train_df))
     inner_data[[j]] <- list(list(
       train = outer_train_df[tr_ids, , drop = FALSE],
       val   = outer_train_df[va_ids, , drop = FALSE]
     ))
   }
-
+  
   list(inner_dirs = inner_dirs, inner_data = inner_data)
 }
