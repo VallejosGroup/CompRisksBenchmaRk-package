@@ -42,7 +42,7 @@ create_nested_splits <- function(cr,
   time_var     <- cr@time_var
   event_var    <- cr@event_var
   id_var       <- cr@id_var
-  feature_vars <- cr@feature_vars
+  feature_vars <- setdiff(cr@var_names, c(time_var, event_var, id_var))
 
   df <- cr@data
 

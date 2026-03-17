@@ -7,6 +7,23 @@ NULL
 
 
 #' @noRd
+.apply_var_types <- function(df, var_types, var_names) {
+  for (i in seq_along(var_names)) {
+    cn <- var_names[[i]]
+    if (!cn %in% names(df)) next
+    df[[cn]] <- switch(var_types[[i]],
+      numeric   = as.numeric(df[[cn]]),
+      integer   = as.integer(df[[cn]]),
+      logical   = as.logical(df[[cn]]),
+      factor    = as.factor(df[[cn]]),
+      as.character(df[[cn]])
+    )
+  }
+  df
+}
+
+
+#' @noRd
 read_bench_parquet <- function(path, schema) {
   df <- apply_data_types(
     as.data.frame(arrow::read_parquet(path)),

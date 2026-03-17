@@ -32,19 +32,20 @@ load_cr_data <- function(store_dir, store_name = NULL) {
   meta <- jsonlite::read_json(meta_path, simplifyVector = TRUE)
   data <- .apply_var_types(
     as.data.frame(arrow::read_parquet(data_path)),
-    unlist(meta$var_types)
+    meta$var_types,
+    meta$var_names
   )
   
   methods::new("cr_data",
-               data          = data,
-               causes        = as.integer(meta$causes),
-               feature_vars  = as.character(meta$feature_vars),
-               var_types = unlist(meta$var_types),
-               time_var      = meta$time_var,
-               event_var     = meta$event_var,
-               id_var        = meta$id_var,
-               sort_by_time  = isTRUE(meta$sort_by_time),
-               time_offset   = as.numeric(meta$time_offset),
-               cens_code     = as.integer(meta$cens_code)
+               data         = data,
+               causes       = as.integer(meta$causes),
+               var_names    = meta$var_names,
+               var_types    = meta$var_types,
+               time_var     = meta$time_var,
+               event_var    = meta$event_var,
+               id_var       = meta$id_var,
+               sort_by_time = isTRUE(meta$sort_by_time),
+               time_offset  = as.numeric(meta$time_offset),
+               cens_code    = as.integer(meta$cens_code)
   )
 }

@@ -9,12 +9,12 @@ apply_data_types(df, schema)
 \arguments{
 \item{df}{A data frame.}
 
-\item{schema}{A schema list as returned by [infer_data_types()].}
+\item{schema}{A schema list as returned by [schema_from_metadata()].}
 }
 \value{
 The coerced data frame.
 }
 \description{
 Coerces columns of `df` to the types recorded in `schema` (as produced
-by [infer_data_types()]).
+by [schema_from_metadata()]).
 }

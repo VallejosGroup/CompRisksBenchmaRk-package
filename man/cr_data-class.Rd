@@ -36,7 +36,9 @@ construction.
 \item{\code{causes}}{Sorted integer vector of competing cause codes (all
 non-zero values found in \code{event_var}).}
 
-\item{\code{feature_vars}}{Character vector of feature column names.}
+\item{\code{var_names}}{Character vector of all column names in the same order
+as \code{var_types}.  Feature variable names can be derived as
+\code{setdiff(var_names, c(time_var, event_var, id_var))}.}
 
 \item{\code{var_types}}{Named character vector of original column types.  Names
 are column names; values are one of \code{"logical"}, \code{"factor"},

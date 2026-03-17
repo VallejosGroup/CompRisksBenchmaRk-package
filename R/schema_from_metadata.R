@@ -12,7 +12,7 @@
 #' @export
 schema_from_metadata <- function(metadata) {
   core_cols    <- c(metadata$time_var, metadata$event_var, metadata$id_var)
-  feature_vars <- metadata$feature_vars
+  feature_vars <- setdiff(metadata$var_names, c(metadata$time_var, metadata$event_var, metadata$id_var))
 
   # var_types is now a named vector covering core + feature cols
   types <- as.list(metadata$var_types)

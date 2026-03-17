@@ -22,7 +22,7 @@ register_cr_model(
       stop("Please install 'randomForestSRC'.")
 
     formula <- stats::reformulate(
-      obj@feature_vars,
+      setdiff(obj@var_names, c(obj@time_var, obj@event_var, obj@id_var)),
       response = paste0("Surv(", obj@time_var, ", ", obj@event_var, ")")
     )
 

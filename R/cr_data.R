@@ -8,8 +8,10 @@
 #'   \code{sort_by_time = TRUE}.
 #' @slot causes       Sorted integer vector of competing cause codes (all
 #'   non-zero values found in \code{event_var}).
-#' @slot feature_vars  Character vector of feature column names.
-#' @slot var_types Named character vector of original column types.  Names
+#' @slot var_names    Character vector of all column names in the same order
+#'   as \code{var_types}.  Feature variable names can be derived as
+#'   \code{setdiff(var_names, c(time_var, event_var, id_var))}.
+#' @slot var_types    Named character vector of original column types.  Names
 #'   are column names; values are one of \code{"logical"}, \code{"factor"},
 #'   \code{"character"}, \code{"integer"}, \code{"numeric"}.  Covers
 #'   \code{time_var}, \code{event_var}, \code{id_var}, and all feature columns
@@ -32,8 +34,8 @@ NULL
 methods::setClass("cr_data", representation(
   data         = "data.frame",
   causes       = "integer",
-  feature_vars  = "character",
-  var_types = "character",
+  var_names    = "character",
+  var_types    = "character",
   time_var     = "character",
   event_var    = "character",
   id_var       = "character",
@@ -71,23 +73,23 @@ cr_data <- function(data, time_var, event_var,
                     id_var       = NULL,
                     time_offset  = 0,
                     cens_code    = 0) {
-
+  
   # --- Input validation ---
   if (!is.data.frame(data))
     stop("`data` must be a data frame.", call. = FALSE)
   if (nrow(data) == 0)
     stop("`data` has no rows.", call. = FALSE)
-
+  
   if (!is.character(time_var) || length(time_var) != 1 || !nzchar(time_var))
     stop("`time_var` must be a single non-empty string.", call. = FALSE)
   if (!is.character(event_var) || length(event_var) != 1 || !nzchar(event_var))
     stop("`event_var` must be a single non-empty string.", call. = FALSE)
-
+  
   if (!time_var %in% names(data))
     stop(sprintf("`time_var` '%s' not found in `data`.", time_var), call. = FALSE)
   if (!event_var %in% names(data))
     stop(sprintf("`event_var` '%s' not found in `data`.", event_var), call. = FALSE)
-
+  
   if (!is.null(id_var)) {
     if (!is.character(id_var) || length(id_var) != 1 || !nzchar(id_var))
       stop("`id_var` must be a single non-empty string.", call. = FALSE)
@@ -106,26 +108,26 @@ cr_data <- function(data, time_var, event_var,
     data[["id"]] <- seq_len(nrow(data))
     id_var <- "id"
   }
-
+  
   if (!is.numeric(data[[time_var]]))
     stop(sprintf("`time_var` '%s' must be numeric.", time_var), call. = FALSE)
   if (any(is.na(data[[time_var]])))
     stop(sprintf("`time_var` '%s' contains NA values.", time_var), call. = FALSE)
-
+  
   event <- data[[event_var]]
   if (!is.numeric(event) && !is.integer(event) && !is.factor(event))
     stop(sprintf("`event_var` '%s' must be numeric, integer, or factor.", event_var),
          call. = FALSE)
   if (any(is.na(event)))
     stop(sprintf("`event_var` '%s' contains NA values.", event_var), call. = FALSE)
-
+  
   if (!is.numeric(time_offset) || length(time_offset) != 1 || time_offset < 0)
     stop("`time_offset` must be a single non-negative number.", call. = FALSE)
-
+  
   if (!is.numeric(cens_code) || length(cens_code) != 1)
     stop("`cens_code` must be a single integer value.", call. = FALSE)
   cens_code <- as.integer(cens_code)
-
+  
   # --- Zero-time guard ---
   min_time <- suppressWarnings(min(data[[time_var]], na.rm = TRUE))
   if (is.finite(min_time) && min_time == 0) {
@@ -138,10 +140,10 @@ cr_data <- function(data, time_var, event_var,
       )
     data[[time_var]] <- data[[time_var]] + time_offset
   }
-
+  
   # --- Type coercion ---
   data[[event_var]] <- as.integer(as.character(data[[event_var]]))
-
+  
   feature_cols <- setdiff(names(data), c(time_var, event_var, id_var))
   covars_types <- vector("character", length(feature_cols))
   for (i in seq_along(feature_cols)) {
@@ -159,41 +161,44 @@ cr_data <- function(data, time_var, event_var,
       data[[feature_cols[[i]]]] <- as.numeric(x)
     }
   }
-  names(covars_types) <- feature_cols
-
+  
   # Derive types for time_var, event_var, id_var
   .col_type <- function(x) {
-    if (is.logical(x))   "logical"
+    if (is.logical(x))        "logical"
     else if (is.factor(x))    "factor"
     else if (is.character(x)) "character"
     else if (is.integer(x))   "integer"
     else                      "numeric"
   }
   core_types <- c(
-    stats::setNames(.col_type(data[[time_var]]),  time_var),
-    stats::setNames(.col_type(data[[event_var]]), event_var),
-    stats::setNames(.col_type(data[[id_var]]),    id_var)
+    .col_type(data[[id_var]]),
+    .col_type(data[[time_var]]),
+    .col_type(data[[event_var]])
   )
-  covars_types <- c(core_types, covars_types)
-
+  all_types <- c(core_types, covars_types)
+  all_names <- c(id_var, time_var, event_var, feature_cols)
+  
+  # Reorder data columns to match: id, time, event, features
+  data <- data[, all_names, drop = FALSE]
+  
   # --- Optional sort by time ---
   if (sort_by_time)
     data <- data[order(data[[time_var]]), , drop = FALSE]
-
+  
   # --- Cause and covariate extraction ---
   causes <- .cr_causes(data, event_var, cens_code)
-
+  
   methods::new("cr_data",
-    data          = data,
-    causes        = causes,
-    feature_vars  = feature_cols,
-    var_types = covars_types,
-    time_var      = time_var,
-    event_var     = event_var,
-    id_var        = id_var,
-    sort_by_time  = sort_by_time,
-    time_offset   = time_offset,
-    cens_code     = cens_code
+               data         = data,
+               causes       = causes,
+               var_names    = all_names,
+               var_types    = all_types,
+               time_var     = time_var,
+               event_var    = event_var,
+               id_var       = id_var,
+               sort_by_time = sort_by_time,
+               time_offset  = time_offset,
+               cens_code    = cens_code
   )
 }
 
@@ -215,7 +220,7 @@ methods::setMethod("summary", "cr_data", function(object, ...) {
   event_var <- object@event_var
   causes    <- object@causes
   cens_code <- object@cens_code
-
+  
   # Build labelled event factor: "Censored" + "Cause k" for each cause
   ev_int    <- as.integer(d[[event_var]])
   cens_lbl  <- paste0("Censored (", cens_code, ")")
@@ -223,23 +228,24 @@ methods::setMethod("summary", "cr_data", function(object, ...) {
   lvls      <- c(cens_code, causes)
   lbls      <- c(cens_lbl, cause_lbls)
   ev_factor <- factor(ev_int, levels = lvls, labels = lbls)
-
+  
   # Assemble table data: time + covariates + event factor
-  covar_names <- object@feature_vars
+  feature_vars <- setdiff(object@var_names, c(object@time_var, object@event_var, object@id_var))
+  covar_names  <- feature_vars
   tbl_data    <- cbind(
     d[, c(time_var, covar_names), drop = FALSE],
     .event_status = ev_factor
   )
-
+  
   # Apply table1 labels: time_var gets a readable label
   table1::label(tbl_data[[time_var]]) <- paste0("Survival time (", time_var, ")")
-
+  
   # Build formula: all vars on LHS, event factor on RHS
   rhs_vars <- c(time_var, covar_names)
   f <- stats::as.formula(
     paste("~", paste(rhs_vars, collapse = " + "), "| .event_status")
   )
-
+  
   tbl <- table1::table1(f, data = tbl_data, overall = "Overall")
   print(tbl)
   invisible(tbl)
@@ -259,8 +265,11 @@ methods::setMethod("show", "cr_data", function(object) {
   cat(sprintf("  event_var : %s\n", object@event_var))
   cat(sprintf("  id_var    : %s\n", object@id_var))
   cat(sprintf("  Covariates: %d  [%s]\n",
-              length(object@feature_vars),
-              paste(object@feature_vars, collapse = ", ")))
+              length(setdiff(object@var_names,
+                             c(object@time_var, object@event_var, object@id_var))),
+              paste(setdiff(object@var_names,
+                            c(object@time_var, object@event_var, object@id_var)),
+                    collapse = ", ")))
   if (object@time_offset != 0)
     cat(sprintf("  time_offset applied: %g\n", object@time_offset))
   invisible(object)
@@ -281,7 +290,7 @@ methods::setMethod("dim", "cr_data", function(x) dim(x@data))
 #'   \item{\code{cr_get_data}}{Returns the data frame stored in the
 #'     \code{data} slot.}
 #'   \item{\code{cr_metadata}}{Returns a named list of all metadata slots
-#'     (\code{causes}, \code{feature_vars}, \code{var_types},
+#'     (\code{causes}, \code{var_names}, \code{var_types},
 #'     \code{time_var}, \code{event_var}, \code{id_var},
 #'     \code{sort_by_time}, \code{time_offset}, \code{cens_code}).}
 #' }
@@ -303,15 +312,15 @@ methods::setMethod("cr_get_data", "cr_data", function(x) x@data)
 
 methods::setMethod("cr_metadata", "cr_data", function(x) {
   list(
-    causes        = x@causes,
-    feature_vars  = x@feature_vars,
-    var_types = x@var_types,
-    time_var      = x@time_var,
-    event_var     = x@event_var,
-    id_var        = x@id_var,
-    sort_by_time  = x@sort_by_time,
-    time_offset   = x@time_offset,
-    cens_code     = x@cens_code
+    causes       = x@causes,
+    var_names    = x@var_names,
+    var_types    = x@var_types,
+    time_var     = x@time_var,
+    event_var    = x@event_var,
+    id_var       = x@id_var,
+    sort_by_time = x@sort_by_time,
+    time_offset  = x@time_offset,
+    cens_code    = x@cens_code
   )
 })
 
@@ -334,38 +343,36 @@ methods::setMethod("cr_metadata", "cr_data", function(x) {
 #' @return A new \code{cr_data} object.
 #' @exportMethod [
 methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
-  function(x, i, j, drop) {
-    new_data <- if (missing(i)) x@data else x@data[i, , drop = FALSE]
-
-    if (!missing(j)) {
-      protected <- c(x@time_var, x@event_var,
-                     if (nzchar(x@id_var)) x@id_var)
-      bad <- intersect(protected, setdiff(names(new_data), j))
-      if (length(bad))
-        stop(sprintf(
-          "Cannot drop protected column(s): %s",
-          paste(bad, collapse = ", ")
-        ), call. = FALSE)
-      keep_cols <- union(protected, intersect(j, names(new_data)))
-      new_data  <- new_data[, keep_cols, drop = FALSE]
-    }
-
-    keep_feat  <- x@feature_vars %in% names(new_data)
-    kept_vars  <- x@feature_vars[keep_feat]
-    # var_types is named — subset by name to correctly handle core + feature cols
-    kept_types <- x@var_types[names(x@var_types) %in% names(new_data)]
-
-    methods::new("cr_data",
-      data         = new_data,
-      causes       = .cr_causes(new_data, x@event_var, x@cens_code),
-      feature_vars  = kept_vars,
-      var_types = kept_types,
-      time_var     = x@time_var,
-      event_var    = x@event_var,
-      id_var       = x@id_var,
-      sort_by_time = x@sort_by_time,
-      time_offset  = x@time_offset,
-      cens_code    = x@cens_code
-    )
-  }
+                   function(x, i, j, drop) {
+                     new_data <- if (missing(i)) x@data else x@data[i, , drop = FALSE]
+                     
+                     if (!missing(j)) {
+                       protected <- c(x@time_var, x@event_var,
+                                      if (nzchar(x@id_var)) x@id_var)
+                       bad <- intersect(protected, setdiff(names(new_data), j))
+                       if (length(bad))
+                         stop(sprintf(
+                           "Cannot drop protected column(s): %s",
+                           paste(bad, collapse = ", ")
+                         ), call. = FALSE)
+                       keep_cols <- union(protected, intersect(j, names(new_data)))
+                       new_data  <- new_data[, keep_cols, drop = FALSE]
+                     }
+                     
+                     kept_names <- x@var_names[x@var_names %in% names(new_data)]
+                     kept_types <- x@var_types[x@var_names %in% names(new_data)]
+                     
+                     methods::new("cr_data",
+                                  data         = new_data,
+                                  causes       = .cr_causes(new_data, x@event_var, x@cens_code),
+                                  var_names    = kept_names,
+                                  var_types    = kept_types,
+                                  time_var     = x@time_var,
+                                  event_var    = x@event_var,
+                                  id_var       = x@id_var,
+                                  sort_by_time = x@sort_by_time,
+                                  time_offset  = x@time_offset,
+                                  cens_code    = x@cens_code
+                     )
+                   }
 )

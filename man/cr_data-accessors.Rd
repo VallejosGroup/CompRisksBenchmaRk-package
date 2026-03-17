@@ -21,7 +21,7 @@ See individual descriptions above.
   \item{\code{cr_get_data}}{Returns the data frame stored in the
     \code{data} slot.}
   \item{\code{cr_metadata}}{Returns a named list of all metadata slots
-    (\code{causes}, \code{feature_vars}, \code{var_types},
+    (\code{causes}, \code{var_names}, \code{var_types},
     \code{time_var}, \code{event_var}, \code{id_var},
     \code{sort_by_time}, \code{time_offset}, \code{cens_code}).}
 }

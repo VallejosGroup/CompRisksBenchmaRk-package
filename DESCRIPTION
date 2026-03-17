@@ -58,6 +58,7 @@ URL: https://github.com/VallejosGroup/CompRisksBenchmark
 BugReports: https://github.com/VallejosGroup/CompRisksBenchmark/issues
 Collate:
     'cr_data.R'
+    'utils_load.R'
     'load_cr_data.R'
     'store_cr_data.R'
     'utils_registry.R'
@@ -77,7 +78,6 @@ Collate:
     'ibs_from_r.R'
     'clinical_utility.R'
     'compute_metrics.R'
-    'utils_load.R'
     'nested_cv.R'
     'model_FGR.R'
     'model_FGRP.R'
