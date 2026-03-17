@@ -45,11 +45,11 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                                  seed                   = 123L,
                                  verbose                = TRUE,
                                  drop_cols_after_impute = NULL) {
-
+  
   # Load CV metadata
   cv_meta_path <- file.path(out_dir, "cv_splits_metadata.json")
   cv_meta <- jsonlite::fromJSON(cv_meta_path, simplifyVector = TRUE)
-
+  
   # Extract CV metadata - consider removing drop_cols_after_impute (this would be handled by the imputation function)
   outer_folds  <- as.integer(cv_meta$outer_folds)
   inner_folds  <- as.integer(cv_meta$inner_folds)
@@ -57,16 +57,16 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                           c(cv_meta$time_var, cv_meta$event_var, cv_meta$id_var))
   if (!is.null(drop_cols_after_impute))
     feature_cols <- setdiff(feature_cols, drop_cols_after_impute)
-
+  
   time_var  <- cv_meta$time_var
   event_var <- cv_meta$event_var
   id_var    <- cv_meta$id_var
   causes    <- as.integer(cv_meta$causes)
-
+  
   # Get information about the model and whether it requires tuning
   model_info <- get_cr_model(model_key)$info()
   has_grid   <- isTRUE(model_info$needs_tuning)
-
+  
   # Define grid for tuning parameters and show progress messages
   if (has_grid) {
     if (is.null(grid))
@@ -85,24 +85,24 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       cat("Outer folds:", outer_folds, "\n")
     }
   }
-
+  
   # Create output object to store results
   results <- vector("list", outer_folds)
-
+  
   # Loop over the outer folds
   for (v in seq_len(outer_folds)) {
-
+    
     # Read the outer fold data (train/test splits, possibly with multiple imputations)
     fold_dir   <- file.path(out_dir, sprintf("outer_%d", v))
     outer_data <- .load_outer_data(fold_dir, cv_meta)
     # Note: m_outer > 1 if multiple imputations were stored for the outer fold; otherwise m_outer = 1
     m_outer    <- length(outer_data)
-
+    
     train  <- outer_data[[1]]$train
     test   <- outer_data[[1]]$test
-
+    
     set.seed(seed + v)
-
+    
     # ---- no tuning ----
     if (!has_grid) {
       cif_list <- vector("list", m_outer)
@@ -124,26 +124,26 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       # Pool CIF predictions across imputations (no-op when m_outer = 1);
       # pred is a predict_cif-style list with $cif, $time_grid, $model_key, $ids
       pred <- .pool_cifs_mean(cif_list)
-
+      
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
       save_cif_r(store_dir, cif = pred$cif, cif_time_grid = pred$time_grid,
                  row_ids = rownames(test), causes = causes)
-
+      
       results[[v]] <- list(
         fold          = v,
         model_key     = model_key,
         cif_time_grid = cif_time_grid
       )
       if (verbose) cat("[outer", v, "] done (no tuning) \n")
-
-    # ---- with tuning ----
+      
+      # ---- with tuning ----
     } else {
       # Read the inner fold data (train/val splits within the outer training set)
       inner_loaded <- .load_inner_data(fold_dir, cv_meta,
                                        outer_train_df = train)
       inner_dirs   <- inner_loaded$inner_dirs
       inner_data   <- inner_loaded$inner_data
-
+      
       # Evaluate each hyperparameter configuration across all inner folds.
       # cfg_scores is a matrix [ncause x inner_folds] per grid config, returned
       # as a list-column by sapply — reshaped into a 3D array below.
@@ -152,17 +152,17 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         if (verbose)
           cat("[outer", v, "] grid", gi, "/", length(grid_list), ":",
               paste(names(cfg), cfg, collapse = " "), "\n")
-
+        
         # Accumulate IBS per cause per inner fold for this config
         inner_vals <- matrix(NA_real_,
                              nrow = length(causes), ncol = inner_folds)
-
+        
         for (j in seq_along(inner_dirs)) {
           jj       <- inner_data[[j]]
           # Note: m_inner > 1 if multiple imputations are present; otherwise m_inner = 1
           m_inner  <- length(jj)
           cif_list <- vector("list", m_inner)
-
+          
           for (m in seq_len(m_inner)) {
             tr_m   <- jj[[m]]$train
             va_m   <- jj[[m]]$val
@@ -177,7 +177,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                                          newdata   = cr_data(va_m, time_var = time_var, event_var = event_var, id_var = id_var),
                                          time_grid = cif_time_grid)
           }
-
+          
           # Pool CIF predictions across imputations (no-op when m_inner = 1)
           cif_in  <- .pool_cifs_mean(cif_list)
           # Use true (unimputed) outcomes from the first imputation's val set
@@ -189,7 +189,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                                      pred_horizons = cif_time_grid,
                                      metrics       = "IBS",
                                      collapse_as_df = FALSE)
-
+          
           # Store the cumulative IBS (last value = IBS up to max time) per cause
           for (ci in seq_along(causes)) {
             kk <- causes[ci]
@@ -200,10 +200,10 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         }
         inner_vals
       })
-
+      
       ncause <- length(causes)
       ngrids <- length(grid_list)
-
+      
       # Reshape cfg_scores into a [ncause x inner_folds x ngrids] array and
       # average across inner folds to get mean IBS per cause per config
       cfg_mat <- array(as.vector(cfg_scores),
@@ -218,17 +218,17 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       best_idx <- apply(cfg_av, 1L, which.min)
       best_cfg <- mapply(function(i) grid_list[[i]], best_idx,
                          SIMPLIFY = FALSE)
-
+      
       # Initialise the raw prediction array for the outer test set;
       # causes are filled in separately below and pooled into a single array
       pred <- array(NA_real_, dim = c(nrow(test), ncause, length(cif_time_grid)))
-
+      
       frgp_details <- identical(model_key, "FGRP")
       if (frgp_details) {
         store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
         dir.create(store_dir, recursive = TRUE, showWarnings = FALSE)
       }
-
+      
       # Refit using the best config per cause on the full outer training set
       for (ci in seq_along(causes)) {
         kk        <- causes[ci]
@@ -236,7 +236,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         cif_list  <- vector("list", m_outer)
         coef_list <- if (frgp_details) vector("list", m_outer) else NULL
         fit_list  <- if (frgp_details) vector("list", m_outer) else NULL
-
+        
         for (mii in seq_len(m_outer)) {
           tr_k  <- outer_data[[mii]]$train
           te_k  <- outer_data[[mii]]$test
@@ -255,11 +255,11 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
             coef_list[[mii]] <- extract_fgrp_coefs(fit_i, tol = 1e-8)
           }
         }
-
+        
         # Pool CIF predictions across imputations and slot into the combined array
         pred_i       <- .pool_cifs_mean(cif_list)
         pred[, ci, ] <- pred_i$cif[, ci, ]
-
+        
         if (verbose)
           cat("[outer", v, "] best cfg idx:",
               best_idx[paste0("cause_", kk)],
@@ -267,7 +267,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
               sprintf("%.6f", cfg_av[paste0("cause_", kk),
                                      paste0("cfg_", best_idx[paste0("cause_", kk)])]),
               " cause:", kk, "\n")
-
+        
         # FGRP-specific: save best config, fitted models, and coefficients to disk
         if (frgp_details) {
           store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
@@ -285,11 +285,11 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                            row.names = FALSE)
         }
       }
-
+      
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
       save_cif_r(store_dir, cif = pred, cif_time_grid = cif_time_grid,
                  row_ids = rownames(test), causes = causes)
-
+      
       results[[v]] <- list(
         fold          = v,
         model_key     = model_key,
