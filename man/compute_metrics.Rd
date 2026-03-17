@@ -15,6 +15,9 @@ compute_metrics(
   args_pec = list(cens.model = "marginal", splitMethod = "noPlan", verbose = FALSE),
   args_rmlt = list(maxT = NULL),
   args_calibration = list(loess_smoothing = TRUE, bandwidth = NULL, graph = TRUE),
+  args_clinical_utility = list(graph = TRUE, xstart = 0.01, xstop = 0.99, xby = 0.01,
+    ymin = -0.05, harm = 0, intervention = FALSE, interventionper = 100, smooth = FALSE,
+    loess.span = 0.1),
   snap_tol = 0.1,
   collapse_as_df = TRUE
 )
@@ -42,7 +45,8 @@ is then taken from `cif$time_grid`).}
 `"tdAUC"` (time-dependent AUC),
 `"cindex_t_year"` (C-index via \pkg{pec}),
 `"cindex_rmlt"` (C-index via restricted mean lifetime),
-`"calibration"` (calibration summary statistics).
+`"calibration"` (calibration summary statistics),
+`"clinical_utility"` (decision curve analysis).
 Note: requesting `"IBS"` implicitly also computes `"Brier"`.}
 
 \item{pred_horizons}{Numeric vector of prediction horizons at which metrics
@@ -81,6 +85,17 @@ is used; `bandwidth` sets the bandwidth for nearest-neighbour smoothing
 calibration ggplot objects are produced (set to `FALSE` to skip plot
 generation when only `calibration` statistics are needed; `calib_graphs`
 will then be absent from the result).}
+
+\item{args_clinical_utility}{A named list of arguments passed to the
+internal DCA routine. Relevant for `"clinical_utility"`. Defaults:
+`list(graph = TRUE, xstart = 0.01, xstop = 0.99, xby = 0.01,
+ymin = -0.05, harm = 0, intervention = FALSE, interventionper = 100,
+smooth = FALSE, loess.span = 0.10)`. Any element supplied here overrides
+the corresponding default. `graph` controls whether a ggplot is produced
+per cause per horizon (set to `FALSE` to skip plot generation). The
+result always contains `dca` — a named list per cause, each a named list
+per `pred_horizons` value, each with `net_benefit`,
+`interventions_avoided`, and optionally `plot`.}
 
 \item{snap_tol}{Maximum allowable absolute difference between a
 `pred_horizons` value and its nearest point on the CIF time grid.  An
@@ -123,6 +138,10 @@ When `collapse_as_df = TRUE` (default), a named list with some
     \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
       one per `pred_horizons` value. Present only when `"calibration"`
       is requested and `args_calibration$graph = TRUE` (the default).}
+    \item{`dca`}{Named list (keyed by cause), each a named list keyed by
+      `pred_horizons` value. Each element contains `net_benefit`,
+      `interventions_avoided`, and optionally `plot`. Present only when
+      `"clinical_utility"` is requested.}
   }
   When `collapse_as_df = FALSE`, a named list with one element per
   requested metric, each being a named list with one entry per cause.

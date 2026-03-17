@@ -243,27 +243,25 @@ calib_FGR$calib_graphs
 
 ## 6  Decision curve analysis
 
-```{r dca, fig.alt="Decision curve analysis for 5-year death risk"}
-# Add each model's 5-year cause-2 predictions as columns for DCA
-hi       <- which.min(abs(time_grid - horizon))   # index of horizon in time_grid
-test_dca <- cr@data
-for (key in model_keys)
-  test_dca[[paste0("pred_", key)]] <- cifs[[key]]$cif[, 2, hi]
+Clinical utility (net benefit) curves are computed via `compute_metrics()`
+using the `"clinical_utility"` metric, evaluated separately for each cause
+and each prediction horizon.
 
-pred_cols <- paste0("pred_", model_keys[-2])
+```{r dca, fig.alt="Decision curve analysis for 5-year competing risks"}
+dca_FGR   <- compute_metrics(cr, cif = cif_FGR,   metrics = "clinical_utility",
+                              pred_horizons = horizon)
+dca_csCPH <- compute_metrics(cr, cif = cif_csCPH, metrics = "clinical_utility",
+                              pred_horizons = horizon)
+dca_RSF   <- compute_metrics(cr, cif = cif_RSF,   metrics = "clinical_utility",
+                              pred_horizons = horizon)
+dca_FGRP  <- compute_metrics(cr, cif = cif_FGRP,  metrics = "clinical_utility",
+                              pred_horizons = horizon)
 
-du <- clinical_utility(
-  data         = test_dca,
-  outcome      = cr@event_var,
-  ttoutcome    = cr@time_var,
-  timepoint    = horizon,
-  predictors   = pred_cols,
-  graph        = TRUE,
-  intervention = FALSE,
-  cmprsk       = TRUE
-)
+# Net benefit data for FGR, cause 1, at the 5-year horizon
+dca_FGR$dca$cause_1$pred_horizons_5$net_benefit
 
-print(du$plot)
+# Plot for FGR, cause 1
+dca_FGR$dca$cause_1$pred_horizons_5$plot
 ```
 
 ---

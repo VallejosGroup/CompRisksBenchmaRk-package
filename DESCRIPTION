@@ -67,7 +67,7 @@ Collate:
     'predict_cif.R'
     'list_cr_models.R'
     'data_prep.R'
-    'cv_splits.R'
+    'create_nested_splits.R'
     'imputation.R'
     'cif_io.R'
     'utils_metrics.R'

@@ -25,7 +25,8 @@
 #'   `"tdAUC"` (time-dependent AUC),
 #'   `"cindex_t_year"` (C-index via \pkg{pec}),
 #'   `"cindex_rmlt"` (C-index via restricted mean lifetime),
-#'   `"calibration"` (calibration summary statistics).
+#'   `"calibration"` (calibration summary statistics),
+#'   `"clinical_utility"` (decision curve analysis).
 #'   Note: requesting `"IBS"` implicitly also computes `"Brier"`.
 #' @param pred_horizons Numeric vector of prediction horizons at which metrics
 #'   are evaluated (length `Tm`).  Each value is mapped to the nearest point
@@ -59,6 +60,16 @@
 #'   calibration ggplot objects are produced (set to `FALSE` to skip plot
 #'   generation when only `calibration` statistics are needed; `calib_graphs`
 #'   will then be absent from the result).
+#' @param args_clinical_utility A named list of arguments passed to the
+#'   internal DCA routine. Relevant for `"clinical_utility"`. Defaults:
+#'   `list(graph = TRUE, xstart = 0.01, xstop = 0.99, xby = 0.01,
+#'   ymin = -0.05, harm = 0, intervention = FALSE, interventionper = 100,
+#'   smooth = FALSE, loess.span = 0.10)`. Any element supplied here overrides
+#'   the corresponding default. `graph` controls whether a ggplot is produced
+#'   per cause per horizon (set to `FALSE` to skip plot generation). The
+#'   result always contains `dca` — a named list per cause, each a named list
+#'   per `pred_horizons` value, each with `net_benefit`,
+#'   `interventions_avoided`, and optionally `plot`.
 #' @param snap_tol Maximum allowable absolute difference between a
 #'   `pred_horizons` value and its nearest point on the CIF time grid.  An
 #'   error is raised if any mapped difference exceeds this tolerance (default
@@ -137,6 +148,10 @@
 #'     \item{`calib_graphs`}{Named list (keyed by cause) of ggplot objects,
 #'       one per `pred_horizons` value. Present only when `"calibration"`
 #'       is requested and `args_calibration$graph = TRUE` (the default).}
+#'     \item{`dca`}{Named list (keyed by cause), each a named list keyed by
+#'       `pred_horizons` value. Each element contains `net_benefit`,
+#'       `interventions_avoided`, and optionally `plot`. Present only when
+#'       `"clinical_utility"` is requested.}
 #'   }
 #'   When `collapse_as_df = FALSE`, a named list with one element per
 #'   requested metric, each being a named list with one entry per cause.
@@ -157,12 +172,22 @@ compute_metrics <- function(cr,
                             args_calibration    = list(loess_smoothing = TRUE,
                                                        bandwidth       = NULL,
                                                        graph           = TRUE),
+                            args_clinical_utility = list(graph         = TRUE,
+                                                         xstart        = 0.01,
+                                                         xstop         = 0.99,
+                                                         xby           = 0.01,
+                                                         ymin          = -0.05,
+                                                         harm          = 0,
+                                                         intervention  = FALSE,
+                                                         interventionper = 100,
+                                                         smooth        = FALSE,
+                                                         loess.span    = 0.10),
                             snap_tol       = 0.1,
                             collapse_as_df = TRUE) {
   .check_cr(cr)
 
   valid_metrics <- c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                     "cindex_rmlt", "calibration")
+                     "cindex_rmlt", "calibration", "clinical_utility")
   bad_metrics <- setdiff(metrics, valid_metrics)
   if (length(bad_metrics) > 0)
     stop(sprintf(
@@ -172,11 +197,11 @@ compute_metrics <- function(cr,
     ), call. = FALSE)
 
   needs_pred_horizons <- any(c("Brier", "IBS", "tdAUC", "cindex_t_year",
-                             "calibration") %in% metrics)
+                               "calibration", "clinical_utility") %in% metrics)
   if (needs_pred_horizons && is.null(pred_horizons))
     stop(
       '`pred_horizons` must be provided when any of "Brier", "IBS", "tdAUC", ',
-      '"cindex_t_year", or "calibration" is requested.', call. = FALSE
+      '"cindex_t_year", "calibration", or "clinical_utility" is requested.', call. = FALSE
     )
   if (!is.null(pred_horizons)) {
     if (!is.numeric(pred_horizons) || length(pred_horizons) == 0)
@@ -237,6 +262,21 @@ compute_metrics <- function(cr,
     args_calibration
   )
 
+  valid_cu_args <- c("graph", "xstart", "xstop", "xby", "ymin", "harm",
+                     "intervention", "interventionper", "smooth", "loess.span")
+  bad_cu_args <- setdiff(names(args_clinical_utility), valid_cu_args)
+  if (length(bad_cu_args) > 0)
+    warning(sprintf(
+      "Unrecognised element(s) in `args_clinical_utility` will be ignored: %s.",
+      paste(bad_cu_args, collapse = ", ")
+    ), call. = FALSE)
+  cu_args <- modifyList(
+    list(graph = TRUE, xstart = 0.01, xstop = 0.99, xby = 0.01,
+         ymin = -0.05, harm = 0, intervention = FALSE,
+         interventionper = 100, smooth = FALSE, loess.span = 0.10),
+    args_clinical_utility
+  )
+
   time_var  <- cr@time_var
   event_var <- cr@event_var
   causes    <- cr@causes
@@ -257,7 +297,8 @@ compute_metrics <- function(cr,
       "for t-year predictions. Consider `cindex_rmlt` instead."
     )
   comp_cidx_rmlt <- "cindex_rmlt"    %in% metrics
-  comp_calib     <- "calibration" %in% metrics
+  comp_calib     <- "calibration"       %in% metrics
+  comp_cu        <- "clinical_utility"  %in% metrics
 
   if (is.null(pec_args$eval.times) && (comp_cidx_t || comp_cidx_rmlt)) {
     pec_args$eval.times <- max(cr@data[[time_var]][cr@data[[event_var]] != cr@cens_code])
@@ -290,6 +331,7 @@ compute_metrics <- function(cr,
   cindex_rmlt    <- named_list(comp_cidx_rmlt)
   calibration <- named_list(comp_calib)
   calib_graphs   <- named_list(comp_calib)
+  dca            <- named_list(comp_cu)
 
   if (comp_cidx_rmlt) {
     rmlt <- do.call(compute_rmlt, c(
@@ -413,6 +455,21 @@ compute_metrics <- function(cr,
       cindex_rmlt[[nm]] <- cidx_rmlt$AppCindex[[nm]]
     }
 
+    if (comp_cu && !is.null(snap_idx)) {
+      ph_nms    <- paste0("pred_horizons_", pred_horizons)
+      dca[[nm]] <- stats::setNames(vector("list", length(pred_horizons)), ph_nms)
+      for (j in seq_along(pred_horizons)) {
+        dca[[nm]][[j]] <- do.call(.clinical_utility, c(
+          list(predictions = cif[, i, snap_idx[j]],
+               cr          = cr,
+               cause       = k,
+               cause_nm    = nm,
+               timepoint   = snapped_times[j]),
+          cu_args
+        ))
+      }
+    }
+
   }
 
   if (comp_calib) {
@@ -438,14 +495,20 @@ compute_metrics <- function(cr,
     tdAUC          = tdAUC,
     cindex_t_year  = cindex_t_year,
     cindex_rmlt    = cindex_rmlt,
-    calibration = calibration
+    calibration    = calibration,
+    dca            = dca
   ))
 
-  # calib_graphs is always a named list (not collapsible) — attached at the end
+  # calib_graphs and dca are nested lists — attached at the end
   if (!collapse_as_df) {
     if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
+    if (comp_cu) result$dca <- dca
     return(result)
   }
+
+  # dca is a nested list (not collapsible) — extract before collapsing
+  dca_result <- result$dca
+  result$dca <- NULL
 
   # All horizon-varying metrics (one value per pred_horizon per cause).
   # Collapsed into a single long data frame: cause, pred_horizons, <metric cols>.
@@ -501,8 +564,9 @@ compute_metrics <- function(cr,
     result$scalar_metrics <- scalar_df
   }
 
-  # Re-attach calib_graphs unchanged
+  # Re-attach calib_graphs and dca unchanged
   if (comp_calib && calib_args$graph) result$calib_graphs <- calib_graphs
+  if (comp_cu) result$dca <- dca_result
 
   result
 }
