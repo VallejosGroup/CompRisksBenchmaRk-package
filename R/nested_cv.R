@@ -45,13 +45,18 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
   
   manifest_path <- file.path(out_dir, "manifest.json")
   times_path    <- file.path(out_dir, "times.json")
-  schema_path   <- file.path(out_dir, "data_types.json")
+  meta_path     <- file.path(out_dir, "cr_metadata.json")
   
   man    <- jsonlite::fromJSON(manifest_path, simplifyVector = TRUE)
   times  <- sort(unique(as.numeric(
     jsonlite::fromJSON(times_path, simplifyVector = TRUE)
   )))
-  schema <- jsonlite::fromJSON(schema_path, simplifyVector = TRUE)
+  schema <- if (file.exists(meta_path))
+    schema_from_metadata(
+      jsonlite::fromJSON(meta_path, simplifyVector = TRUE)
+    )
+  else
+    NULL
   
   outer_folds  <- as.integer(man$outer_folds)
   inner_folds  <- as.integer(man$inner_folds)
