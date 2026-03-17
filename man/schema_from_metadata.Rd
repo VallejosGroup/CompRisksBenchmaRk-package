@@ -15,7 +15,7 @@ A named list with elements `version`, `core_cols`,
   `data_types.json` format.
 }
 \description{
-Converts the metadata list returned by [cr_metadata()] into the schema
-format used by [apply_data_types()], for backwards compatibility with
-pipelines that read `data_types.json`.
+Converts the metadata list returned by [cr_metadata()] into the legacy
+schema format, for backwards compatibility with pipelines that read
+`data_types.json`.
 }

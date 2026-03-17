@@ -246,13 +246,15 @@ build_imputation_cache <- function(out_dir                = "../BenchResults",
 
   for (v in seq_len(outer_folds)) {
     fold_dir <- file.path(out_dir, sprintf("outer_%d", v))
-    train <- apply_data_types(
+    train <- .apply_var_types(
       as.data.frame(arrow::read_parquet(file.path(fold_dir, "train.parquet"))),
-      schema = schema
+      unlist(schema$types),
+      names(schema$types)
     )
-    test <- apply_data_types(
+    test <- .apply_var_types(
       as.data.frame(arrow::read_parquet(file.path(fold_dir, "test.parquet"))),
-      schema = schema
+      unlist(schema$types),
+      names(schema$types)
     )
     rownames(train) <- as.character(train$row_id); train$row_id <- NULL
     rownames(test)  <- as.character(test$row_id);  test$row_id  <- NULL

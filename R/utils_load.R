@@ -25,9 +25,10 @@ NULL
 
 #' @noRd
 read_bench_parquet <- function(path, schema) {
-  df <- apply_data_types(
+  df <- .apply_var_types(
     as.data.frame(arrow::read_parquet(path)),
-    schema = schema
+    unlist(schema$types),
+    names(schema$types)
   )
   if (!("row_id" %in% names(df)))
     stop("row_id column not found in: ", path, call. = FALSE)
