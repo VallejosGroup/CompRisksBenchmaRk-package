@@ -98,17 +98,15 @@ create_nested_splits <- function(cr,
   }
 
   if (store) {
-    for_python <- list(
-      version     = 1,
-      outer_folds = outer_folds,
-      inner_folds = inner_folds,
-      features    = feature_vars,
-      time_col    = time_var,
-      event_col   = event_var,
-      row_id      = id_var
+    cv_splits_metadata <- c(
+      list(
+        outer_folds = outer_folds,
+        inner_folds = inner_folds
+      ),
+      cr_metadata(cr)
     )
-    jsonlite::write_json(for_python,
-                         file.path(store_dir, "manifest.json"),
+    jsonlite::write_json(cv_splits_metadata,
+                         file.path(store_dir, "cv_splits_metadata.json"),
                          auto_unbox = TRUE, pretty = TRUE)
   }
 
