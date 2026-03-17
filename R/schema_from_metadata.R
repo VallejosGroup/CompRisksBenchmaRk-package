@@ -1,8 +1,8 @@
 #' Convert cr_metadata to legacy schema format
 #'
 #' Converts the metadata list returned by [cr_metadata()] into the schema
-#' format previously produced by `infer_data_types()`, for backwards
-#' compatibility with pipelines that read `data_types.json`.
+#' format used by [apply_data_types()], for backwards compatibility with
+#' pipelines that read `data_types.json`.
 #'
 #' @param metadata A named list as returned by [cr_metadata()].
 #'

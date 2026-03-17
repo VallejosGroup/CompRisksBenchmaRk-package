@@ -72,13 +72,40 @@ infer_data_types <- function(df, feature_cols,
 }
 
 
+#' Apply var_types to a data frame
+#'
+#' Coerces columns of `df` to the types recorded in `var_types` (the named
+#' character vector stored in `cr@var_types` / `cr_metadata()$var_types`).
+#' Only columns present in both `df` and `var_types` are coerced.
+#'
+#' @param df       A data frame.
+#' @param var_types A named character vector mapping column names to type
+#'   strings (`"numeric"`, `"integer"`, `"logical"`, `"factor"`,
+#'   `"character"`), as stored in a [cr_data()] object.
+#'
+#' @return The coerced data frame.
+#' @noRd
+.apply_var_types <- function(df, var_types) {
+  for (cn in names(var_types)) {
+    if (!cn %in% names(df)) next
+    df[[cn]] <- switch(var_types[[cn]],
+      numeric   = as.numeric(df[[cn]]),
+      integer   = as.integer(df[[cn]]),
+      logical   = as.logical(df[[cn]]),
+      factor    = as.factor(df[[cn]]),
+      as.character(df[[cn]])
+    )
+  }
+  df
+}
+
 #' Apply stored data types to a data frame
 #'
 #' Coerces columns of `df` to the types recorded in `schema` (as produced
-#' by [infer_data_types()]).
+#' by [schema_from_metadata()]).
 #'
 #' @param df A data frame.
-#' @param schema A schema list as returned by [infer_data_types()].
+#' @param schema A schema list as returned by [schema_from_metadata()].
 #'
 #' @return The coerced data frame.
 #' @export
