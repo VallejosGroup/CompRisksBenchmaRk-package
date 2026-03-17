@@ -24,22 +24,7 @@ NULL
 
 
 #' @noRd
-read_bench_parquet <- function(path, schema) {
-  df <- .apply_var_types(
-    as.data.frame(arrow::read_parquet(path)),
-    unlist(schema$types),
-    names(schema$types)
-  )
-  if (!("row_id" %in% names(df)))
-    stop("row_id column not found in: ", path, call. = FALSE)
-  rownames(df) <- as.character(df$row_id)
-  df$row_id    <- NULL
-  df
-}
-
-
-#' @noRd
-detect_m_from_dir <- function(dir) {
+.detect_m_from_dir <- function(dir) {
   f  <- list.files(dir, pattern = "^train_imp_[0-9]+\\.parquet$",
                    full.names = FALSE)
   if (!length(f)) return(1L)
@@ -54,28 +39,30 @@ detect_m_from_dir <- function(dir) {
 
 
 #' @noRd
-load_outer_data <- function(fold_dir, schema) {
+.load_outer_data <- function(fold_dir, metadata) {
   if (file.exists(file.path(fold_dir, "train_imp_1.parquet")) &&
       file.exists(file.path(fold_dir, "test_imp_1.parquet"))) {
-    mm  <- detect_m_from_dir(fold_dir)
+    mm  <- .detect_m_from_dir(fold_dir)
     out <- vector("list", mm)
     for (k in seq_len(mm)) {
       trp <- file.path(fold_dir, sprintf("train_imp_%d.parquet", k))
       tep <- file.path(fold_dir, sprintf("test_imp_%d.parquet",  k))
-      out[[k]] <- list(train = read_bench_parquet(trp, schema),
-                       test  = read_bench_parquet(tep, schema))
+      out[[k]] <- list(
+        train = .apply_var_types(as.data.frame(arrow::read_parquet(trp)), metadata$var_types, metadata$var_names),
+        test  = .apply_var_types(as.data.frame(arrow::read_parquet(tep)), metadata$var_types, metadata$var_names))
     }
     return(out)
   }
   tr_path <- file.path(fold_dir, "train.parquet")
   te_path <- file.path(fold_dir, "test.parquet")
-  list(list(train = read_bench_parquet(tr_path, schema),
-            test  = read_bench_parquet(te_path, schema)))
+  list(list(
+    train = .apply_var_types(as.data.frame(arrow::read_parquet(tr_path)), metadata$var_types, metadata$var_names),
+    test  = .apply_var_types(as.data.frame(arrow::read_parquet(te_path)), metadata$var_types, metadata$var_names)))
 }
 
 
 #' @noRd
-load_inner_data <- function(fold_dir, schema, outer_train_df) {
+.load_inner_data <- function(fold_dir, metadata, outer_train_df) {
   inner_dir  <- file.path(fold_dir, "inner")
   inner_dirs <- if (dir.exists(inner_dir)) {
     dd <- list.dirs(inner_dir, recursive = FALSE, full.names = TRUE)
@@ -91,13 +78,14 @@ load_inner_data <- function(fold_dir, schema, outer_train_df) {
     idir <- inner_dirs[j]
     if (file.exists(file.path(idir, "train_imp_1.parquet")) &&
         file.exists(file.path(idir, "val_imp_1.parquet"))) {
-      mm <- detect_m_from_dir(idir)
+      mm <- .detect_m_from_dir(idir)
       jj <- vector("list", mm)
       for (k in seq_len(mm)) {
         trp <- file.path(idir, sprintf("train_imp_%d.parquet", k))
         vap <- file.path(idir, sprintf("val_imp_%d.parquet",   k))
-        jj[[k]] <- list(train = read_bench_parquet(trp, schema),
-                        val   = read_bench_parquet(vap, schema))
+        jj[[k]] <- list(
+          train = .apply_var_types(as.data.frame(arrow::read_parquet(trp)), metadata$var_types, metadata$var_names),
+          val   = .apply_var_types(as.data.frame(arrow::read_parquet(vap)), metadata$var_types, metadata$var_names))
       }
       inner_data[[j]] <- jj
       next
