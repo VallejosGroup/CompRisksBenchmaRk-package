@@ -27,20 +27,20 @@ build_store_paths_r <- function(out_dir, model, fold) {
 #' Flattens the 3-D CIF array into a long data frame with columns
 #' `row_id`, `cause`, `time`, and `cif`, then writes it as a Parquet file.
 #'
-#' @param out_dir Directory in which `cif.parquet` is written.
-#' @param cif     3-D array with dimensions `[n, K, Tm]`.
-#' @param times   Numeric vector of evaluation times (length `Tm`).
-#' @param row_ids Character vector of subject identifiers (length `n`).
-#' @param causes  Integer vector of cause codes (length `K`).
+#' @param out_dir       Directory in which `cif.parquet` is written.
+#' @param cif           3-D array with dimensions `[n, K, Tm]`.
+#' @param cif_time_grid Numeric vector of evaluation times (length `Tm`).
+#' @param row_ids       Character vector of subject identifiers (length `n`).
+#' @param causes        Integer vector of cause codes (length `K`).
 #'
 #' @return Invisibly `NULL`.
 #' @export
-save_cif_r <- function(out_dir, cif, times, row_ids, causes) {
+save_cif_r <- function(out_dir, cif, cif_time_grid, row_ids, causes) {
   n  <- dim(cif)[1]; K <- dim(cif)[2]; Tm <- dim(cif)[3]
   df <- data.frame(
     row_id = rep(row_ids, each = K * Tm),
     cause  = rep(rep(causes, each = Tm), times = n),
-    time   = rep(times, times = n * K),
+    time   = rep(cif_time_grid, times = n * K),
     cif    = as.vector(cif)
   )
   if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)

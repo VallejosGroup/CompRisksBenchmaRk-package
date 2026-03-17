@@ -4,14 +4,14 @@
 \alias{save_cif_r}
 \title{Save CIF predictions to a Parquet file}
 \usage{
-save_cif_r(out_dir, cif, times, row_ids, causes)
+save_cif_r(out_dir, cif, cif_time_grid, row_ids, causes)
 }
 \arguments{
 \item{out_dir}{Directory in which `cif.parquet` is written.}
 
 \item{cif}{3-D array with dimensions `[n, K, Tm]`.}
 
-\item{times}{Numeric vector of evaluation times (length `Tm`).}
+\item{cif_time_grid}{Numeric vector of evaluation times (length `Tm`).}
 
 \item{row_ids}{Character vector of subject identifiers (length `n`).}
 

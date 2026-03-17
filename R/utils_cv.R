@@ -15,8 +15,15 @@ NULL
 #' @noRd
 .pool_cifs_mean <- function(cif_list) {
   m      <- length(cif_list)
-  pooled <- cif_list[[1]]
+  pooled <- cif_list[[1]]$cif
   if (m > 1)
     for (i in 2:m) pooled <- pooled + cif_list[[i]]
-  pooled / m
+
+  output <- list(
+    cif       = pooled / m,
+    time_grid = cif_list[[1]]$time_grid,
+    model_key = cif_list[[1]]$model_key,
+    ids       = cif_list[[1]]$ids
+  )
+  return(output)
 }

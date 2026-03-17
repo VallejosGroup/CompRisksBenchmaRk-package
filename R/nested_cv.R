@@ -24,6 +24,8 @@ NULL
 #'   `"../BenchResults"`).
 #' @param model_key Character key of a model registered with
 #'   [register_cr_model()].
+#' @param cif_time_grid Numeric vector of time points at which CIF predictions
+#'   are evaluated.
 #' @param grid      For tunable models: a named list of hyperparameter
 #'   sequences to be expanded via `tidyr::expand_grid()`.  Ignored for
 #'   models with `needs_tuning = FALSE`.
@@ -33,11 +35,12 @@ NULL
 #'   to exclude from the model even after they have been used in imputation.
 #'
 #' @return A list of length `outer_folds`.  Each element is a named list
-#'   containing `fold`, `model_key`, `times`, `best_cfg` (tunable models
+#'   containing `fold`, `model_key`, `cif_time_grid`, `best_cfg` (tunable models
 #'   only), and `metrics` (`causes`, `cause_bs`, `cause_ibs`).
 #' @export
 nested_cv_from_bench <- function(out_dir                = "../BenchResults",
                                  model_key,
+                                 cif_time_grid,
                                  grid                   = NULL,
                                  seed                   = 123L,
                                  verbose                = TRUE,
@@ -59,12 +62,6 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
   event_var <- cv_meta$event_var
   id_var    <- cv_meta$id_var
   causes    <- as.integer(cv_meta$causes)
-  
-  # Load CIF time-grid (this will be replaced by a function parameter)
-  times_path <- file.path(out_dir, "times.json")
-  times      <- sort(unique(as.numeric(
-    jsonlite::fromJSON(times_path, simplifyVector = TRUE)
-  )))
   
   # Get information about the model and whether it requires tuning
   model_info <- get_cr_model(model_key)$info()
@@ -122,31 +119,32 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         cif_list[[m]] <- predict_cif(
           fit,
           newdata   = cr_data(te_m, time_var = time_var, event_var = event_var, id_var = id_var),
-          time_grid = times)
+          time_grid = cif_time_grid)
       }
-      # The next step only applies when m_outer > 1
-      pred    <- .pool_cifs_mean(cif_list)
+      # Pool CIF predictions across imputations (no-op when m_outer = 1);
+      # pred is a predict_cif-style list with $cif, $time_grid, $model_key, $ids
+      pred <- .pool_cifs_mean(cif_list)
       
       # Evaluate performance using the true test set outcomes and the predicted CIFs
       # Note: the outcomes are not affected by the imputation
       cr_test <- cr_data(test, time_var = time_var, event_var = event_var, id_var = id_var)
       perf    <- compute_metrics(cr_test,
-                                 cif           = list(cif = pred, time_grid = times),
-                                 pred_horizons = times,
+                                 cif           = pred,
+                                 pred_horizons = cif_time_grid,
                                  metrics       = c("Brier", "IBS"),
                                  collapse_as_df = FALSE)
       
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
-      save_cif_r(store_dir, cif = pred, times = times,
+      save_cif_r(store_dir, cif = pred$cif, cif_time_grid = pred$time_grid,
                  row_ids = rownames(test), causes = causes)
       
       results[[v]] <- list(
-        fold      = v,
-        model_key = model_key,
-        times     = times,
-        metrics   = list(causes    = causes,
-                         cause_bs  = perf$Brier,
-                         cause_ibs = perf$IBS)
+        fold          = v,
+        model_key     = model_key,
+        cif_time_grid = cif_time_grid,
+        metrics       = list(causes    = causes,
+                             cause_bs  = perf$Brier,
+                             cause_ibs = perf$IBS)
       )
       if (verbose) cat("[outer", v, "] done (no tuning) \n")
       
@@ -189,7 +187,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
             # Predict CIF on inner validation set and store in list
             cif_list[[m]] <- predict_cif(fit_in,
                                          newdata   = cr_data(va_m, time_var = time_var, event_var = event_var, id_var = id_var),
-                                         time_grid = times)
+                                         time_grid = cif_time_grid)
           }
           
           # Pool CIF predictions across imputations (no-op when m_inner = 1)
@@ -199,8 +197,8 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           cr_val  <- cr_data(val_ref, time_var = time_var, event_var = event_var, id_var = id_var)
           # Compute IBS on the pooled CIF for this inner fold
           perf_in <- compute_metrics(cr_val,
-                                     cif           = list(cif = cif_in, time_grid = times),
-                                     pred_horizons = times,
+                                     cif           = cif_in,
+                                     pred_horizons = cif_time_grid,
                                      metrics       = "IBS",
                                      collapse_as_df = FALSE)
           
@@ -233,8 +231,9 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       best_cfg <- mapply(function(i) grid_list[[i]], best_idx,
                          SIMPLIFY = FALSE)
       
-      # Initialise the pooled prediction array for the outer test set
-      pred <- array(NA_real_, dim = c(nrow(test), ncause, length(times)))
+      # Initialise the raw prediction array for the outer test set;
+      # causes are filled in separately below and pooled into a single array
+      pred <- array(NA_real_, dim = c(nrow(test), ncause, length(cif_time_grid)))
       
       frgp_details <- identical(model_key, "FGRP")
       if (frgp_details) {
@@ -262,7 +261,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
           # Predict CIF on outer test set and store in list
           cif_list[[mii]] <- predict_cif(fit_i,
                                          newdata   = cr_data(te_k, time_var = time_var, event_var = event_var, id_var = id_var),
-                                         time_grid = times)
+                                         time_grid = cif_time_grid)
           if (frgp_details) {
             fit_list[[mii]]  <- fit_i
             coef_list[[mii]] <- extract_fgrp_coefs(fit_i, tol = 1e-8)
@@ -271,7 +270,7 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
         
         # Pool CIF predictions across imputations and slot into the combined array
         pred_i       <- .pool_cifs_mean(cif_list)
-        pred[, ci, ] <- pred_i[, ci, ]
+        pred[, ci, ] <- pred_i$cif[, ci, ]
         
         if (verbose)
           cat("[outer", v, "] best cfg idx:",
@@ -300,25 +299,25 @@ nested_cv_from_bench <- function(out_dir                = "../BenchResults",
       }
       
       store_dir <- build_store_paths_r(out_dir, model = model_key, fold = v)
-      save_cif_r(store_dir, cif = pred, times = times,
+      save_cif_r(store_dir, cif = pred, cif_time_grid = cif_time_grid,
                  row_ids = rownames(test), causes = causes)
       
       # Evaluate performance using the true test set outcomes and the pooled predicted CIFs
       # Note: the outcomes are not affected by the imputation
       cr_test <- cr_data(test, time_var = time_var, event_var = event_var, id_var = id_var)
       perf    <- compute_metrics(cr_test,
-                                 cif           = list(cif = pred, time_grid = times),
-                                 pred_horizons = times,
+                                 cif           = list(cif = pred, time_grid = cif_time_grid),
+                                 pred_horizons = cif_time_grid,
                                  metrics       = "IBS",
                                  collapse_as_df = FALSE)
       
       results[[v]] <- list(
-        fold      = v,
-        model_key = model_key,
-        times     = times,
-        best_cfg  = best_cfg,
-        metrics   = list(causes    = causes,
-                         cause_ibs = perf$IBS)
+        fold          = v,
+        model_key     = model_key,
+        cif_time_grid = cif_time_grid,
+        best_cfg      = best_cfg,
+        metrics       = list(causes    = causes,
+                             cause_ibs = perf$IBS)
       )
     }
   }

@@ -95,6 +95,8 @@ cr_data <- function(data, time_var, event_var,
       stop("`id_var` must be a single non-empty string.", call. = FALSE)
     if (!id_var %in% names(data))
       stop(sprintf("`id_var` '%s' not found in `data`.", id_var), call. = FALSE)
+    # Coerce to character — IDs are identifiers, not numeric values
+    data[[id_var]] <- as.character(data[[id_var]])
     if (any(is.na(data[[id_var]])))
       stop(sprintf("`id_var` '%s' contains NA values.", id_var), call. = FALSE)
   } else {
