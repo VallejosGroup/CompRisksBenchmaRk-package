@@ -11,14 +11,11 @@
 #'   `data_types.json` format.
 #' @export
 schema_from_metadata <- function(metadata) {
-  core_cols     <- c(metadata$time_var, metadata$event_var, metadata$id_var)
-  feature_vars  <- metadata$feature_vars
-  feature_types <- metadata$feature_types
+  core_cols    <- c(metadata$time_var, metadata$event_var, metadata$id_var)
+  feature_vars <- metadata$feature_vars
 
-  types <- as.list(stats::setNames(
-    c(rep(NA_character_, length(core_cols)), feature_types),
-    c(core_cols, feature_vars)
-  ))
+  # var_types is now a named vector covering core + feature cols
+  types <- as.list(metadata$var_types)
 
   list(
     version      = 1,

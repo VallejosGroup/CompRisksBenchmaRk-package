@@ -9,9 +9,11 @@
 #' @slot causes       Sorted integer vector of competing cause codes (all
 #'   non-zero values found in \code{event_var}).
 #' @slot feature_vars  Character vector of feature column names.
-#' @slot feature_types Character vector of original column types, parallel
-#'   to \code{feature_vars} (one of \code{"logical"}, \code{"factor"},
-#'   \code{"character"}, \code{"integer"}, \code{"numeric"}).
+#' @slot var_types Named character vector of original column types.  Names
+#'   are column names; values are one of \code{"logical"}, \code{"factor"},
+#'   \code{"character"}, \code{"integer"}, \code{"numeric"}.  Covers
+#'   \code{time_var}, \code{event_var}, \code{id_var}, and all feature columns
+#'   (in that order).
 #' @slot time_var     Name of the time column.
 #' @slot event_var    Name of the event/status column.
 #' @slot id_var       Name of the subject ID column.  Always set: either the
@@ -31,7 +33,7 @@ methods::setClass("cr_data", representation(
   data         = "data.frame",
   causes       = "integer",
   feature_vars  = "character",
-  feature_types = "character",
+  var_types = "character",
   time_var     = "character",
   event_var    = "character",
   id_var       = "character",
@@ -157,6 +159,22 @@ cr_data <- function(data, time_var, event_var,
       data[[feature_cols[[i]]]] <- as.numeric(x)
     }
   }
+  names(covars_types) <- feature_cols
+
+  # Derive types for time_var, event_var, id_var
+  .col_type <- function(x) {
+    if (is.logical(x))   "logical"
+    else if (is.factor(x))    "factor"
+    else if (is.character(x)) "character"
+    else if (is.integer(x))   "integer"
+    else                      "numeric"
+  }
+  core_types <- c(
+    stats::setNames(.col_type(data[[time_var]]),  time_var),
+    stats::setNames(.col_type(data[[event_var]]), event_var),
+    stats::setNames(.col_type(data[[id_var]]),    id_var)
+  )
+  covars_types <- c(core_types, covars_types)
 
   # --- Optional sort by time ---
   if (sort_by_time)
@@ -169,7 +187,7 @@ cr_data <- function(data, time_var, event_var,
     data          = data,
     causes        = causes,
     feature_vars  = feature_cols,
-    feature_types = covars_types,
+    var_types = covars_types,
     time_var      = time_var,
     event_var     = event_var,
     id_var        = id_var,
@@ -263,7 +281,7 @@ methods::setMethod("dim", "cr_data", function(x) dim(x@data))
 #'   \item{\code{cr_get_data}}{Returns the data frame stored in the
 #'     \code{data} slot.}
 #'   \item{\code{cr_metadata}}{Returns a named list of all metadata slots
-#'     (\code{causes}, \code{feature_vars}, \code{feature_types},
+#'     (\code{causes}, \code{feature_vars}, \code{var_types},
 #'     \code{time_var}, \code{event_var}, \code{id_var},
 #'     \code{sort_by_time}, \code{time_offset}, \code{cens_code}).}
 #' }
@@ -287,7 +305,7 @@ methods::setMethod("cr_metadata", "cr_data", function(x) {
   list(
     causes        = x@causes,
     feature_vars  = x@feature_vars,
-    feature_types = x@feature_types,
+    var_types = x@var_types,
     time_var      = x@time_var,
     event_var     = x@event_var,
     id_var        = x@id_var,
@@ -333,12 +351,15 @@ methods::setMethod("[", signature("cr_data", "ANY", "ANY", "missing"),
     }
 
     keep_feat  <- x@feature_vars %in% names(new_data)
+    kept_vars  <- x@feature_vars[keep_feat]
+    # var_types is named — subset by name to correctly handle core + feature cols
+    kept_types <- x@var_types[names(x@var_types) %in% names(new_data)]
 
     methods::new("cr_data",
       data         = new_data,
       causes       = .cr_causes(new_data, x@event_var, x@cens_code),
-      feature_vars  = x@feature_vars[keep_feat],
-      feature_types = x@feature_types[keep_feat],
+      feature_vars  = kept_vars,
+      var_types = kept_types,
       time_var     = x@time_var,
       event_var    = x@event_var,
       id_var       = x@id_var,
